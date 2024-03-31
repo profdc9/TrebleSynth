@@ -1,4 +1,5 @@
 (sym_lib_table
   (lib (name "SSD1306-128x64_OLED")(type "Legacy")(uri "${KIPRJMOD}/SSD1306-128x64_OLED.lib")(options "")(descr ""))
   (lib (name "din-5_180degree-with-shld")(type "KiCad")(uri "${KIPRJMOD}/din-5_180degree-with-shld.kicad_sym")(options "")(descr ""))
+  (lib (name "microsd_spi_cd")(type "Legacy")(uri "${KIPRJMOD}/microsd_spi_cd.lib")(options "")(descr ""))
 )
