@@ -7179,6 +7179,9 @@
     (path "/7c0a3443-6e78-4c33-b3f2-c6e5539da31b/8cd6d2c4-dd93-4399-bee8-97ef07b53162"
       (reference "#PWR0152") (unit 1) (value "GND") (footprint "")
     )
+    (path "/7c0a3443-6e78-4c33-b3f2-c6e5539da31b/08d9f26c-9e6d-476a-8f14-52ff02a39257"
+      (reference "#PWR0153") (unit 1) (value "GND") (footprint "")
+    )
     (path "/7c0a3443-6e78-4c33-b3f2-c6e5539da31b/905547c1-56e3-4196-99dd-262596196eee"
       (reference "#PWR0154") (unit 1) (value "GND") (footprint "")
     )
@@ -7630,7 +7633,7 @@
       (reference "R42") (unit 1) (value "10k") (footprint "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal")
     )
     (path "/7c0a3443-6e78-4c33-b3f2-c6e5539da31b/a49c2511-fefa-423b-a72e-42251f85f8af"
-      (reference "R43") (unit 1) (value "1k") (footprint "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal")
+      (reference "R43") (unit 1) (value "2k2") (footprint "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal")
     )
     (path "/885bf0f8-fef6-4d6f-9a72-f882f1ae2a96"
       (reference "R44") (unit 1) (value "10k") (footprint "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal")
@@ -7714,13 +7717,13 @@
       (reference "R70") (unit 1) (value "1k") (footprint "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal")
     )
     (path "/7c0a3443-6e78-4c33-b3f2-c6e5539da31b/a9724479-a8af-4c2b-a9b9-31c16c084b35"
-      (reference "R71") (unit 1) (value "1k") (footprint "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal")
+      (reference "R71") (unit 1) (value "2k2") (footprint "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal")
     )
     (path "/7c0a3443-6e78-4c33-b3f2-c6e5539da31b/eeff5c38-2d52-4b8c-86ea-f5c33d305fb2"
-      (reference "R72") (unit 1) (value "1k") (footprint "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal")
+      (reference "R72") (unit 1) (value "2k2") (footprint "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal")
     )
     (path "/7c0a3443-6e78-4c33-b3f2-c6e5539da31b/bf56d113-48ba-442e-bd88-18c2292c15c2"
-      (reference "R73") (unit 1) (value "1k") (footprint "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal")
+      (reference "R73") (unit 1) (value "2k2") (footprint "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal")
     )
     (path "/1fba26fe-d2f2-4acc-9daa-6e3d6c311e42"
       (reference "RV1") (unit 1) (value "10k") (footprint "TrebleSynth:Potentiometer_Big_Small_Combined")
