@@ -28,12 +28,11 @@
 #include <string.h>
 #include <stdbool.h>
 #include <math.h>
+#include "main.h"
 #include "treblesynth.h"
 #include "buttons.h"
 #include "ui.h"
 #include "ssd1306_i2c.h"
-
-extern void idle_task(void);
 
 #define cleardisplay() ssd1306_Clear_Buffer();
 #define setcursor(x,y) ssd1306_set_cursor(x,y)

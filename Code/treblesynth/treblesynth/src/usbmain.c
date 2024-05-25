@@ -28,10 +28,11 @@
 #include <string.h>
 #include <ctype.h>
 
-//#include "bsp/board.h"
+#include "treblesynth.h"
 #include "hardware/timer.h"
 #include "tusb.h"
 #include "usbmain.h"
+#include "main.h"
 
 //------------- prototypes -------------//
 void cdc_task(void);
@@ -103,6 +104,7 @@ void midi_send_note(uint8_t note, uint8_t velocity)
         msg[1] = note;                    // Note Number
         msg[2] = velocity;                // Velocity
         tud_midi_n_stream_write(0, 0, msg, 3);
+        uart0_output(msg, 3);
     }
     if (last_note > 0)
     {
@@ -110,18 +112,78 @@ void midi_send_note(uint8_t note, uint8_t velocity)
         msg[1] = last_note;               // Note Number
         msg[2] = 0;                       // Velocity
         tud_midi_n_stream_write(0, 0, msg, 3);
+        uart0_output(msg, 3);
     }
     last_note = note;
 }
 
+void midi_button_event(uint8_t note, uint8_t on_off)
+{
+    uint8_t msg[3];
+
+    if (on_off)
+    {
+        msg[0] = 0x90;                    // Note On - Channel 1
+        msg[1] = note+36;                 // Note Number
+        msg[2] = 127;                     // Velocity
+        tud_midi_n_stream_write(0, 0, msg, 3);
+        uart0_output(msg, 3);
+    } else
+    {
+        msg[0] = 0x80;                    // Note Off - Channel 1
+        msg[1] = note+36;                 // Note Number
+        msg[2] = 127;                     // Velocity
+        tud_midi_n_stream_write(0, 0, msg, 3);
+        uart0_output(msg, 3);
+    }
+}
+
+bool midi_perform_event(const uint8_t cmdbuf[], int num)
+{
+   bool ex = false;
+   int cmdprefix = cmdbuf[0] & 0xF0;
+   if (num > 2)
+   {
+       switch (cmdprefix)
+       {
+            case 0x90:  gpio_put(25,1);
+                        ex = true;
+                        break;
+            case 0x80:  gpio_put(25,0);
+                        ex = true;
+                        break;
+       }
+   }
+   return ex;
+}
+
+void midi_uart_poll(void)
+{
+    static int num = 0;
+    static uint8_t cmdbuf[3];
+    
+    int ch = uart0_input();
+    
+    if (ch < 0) return;
+    if (ch & 0x80) num = 0;
+    if (num < (sizeof(cmdbuf)/sizeof(cmdbuf[0])))
+        cmdbuf[num++] = ch;
+    if ((num >= 2) && (midi_perform_event(cmdbuf, num))) num = 0;
+}
+
 void midi_task(void)
 {
+    uint8_t cmdbuf[4];
+    while ( tud_midi_n_available(0,0) ) 
+    {
+        tud_midi_n_packet_read(0,cmdbuf);
+        midi_perform_event(&cmdbuf[1],3);
+    }
 }
 
 void usb_task(void)
 {
     tud_task();
     cdc_task();
-    //midi_task();
+    midi_task();
 }
-

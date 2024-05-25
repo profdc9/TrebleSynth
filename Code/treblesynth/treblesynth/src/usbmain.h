@@ -12,6 +12,8 @@ void usb_write_char(uint8_t ch);
 int usb_read_character(void);
 void usb_task(void);
 void midi_send_note(uint8_t note, uint8_t velocity);
+void midi_button_event(uint8_t note, uint8_t on_off);
+void midi_uart_poll(void);
 
 #ifdef __cplusplus
 }

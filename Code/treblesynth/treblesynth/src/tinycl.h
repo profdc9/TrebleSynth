@@ -21,6 +21,10 @@ freely, subject to the following restrictions:
 3. This notice may not be removed or altered from any source distribution.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define TINYCL_ARDUINO_DEFAULT
 #define TINYCL_MAX_PARAMETERS 4
 #define TINYCL_COMMAND_BUFFER 250
@@ -72,5 +76,8 @@ void tinycl_put_string(const char *c);
 extern bool tinycl_do_echo;
 extern bool tinycl_do_checksum;
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif  /* _TINYCL_H */

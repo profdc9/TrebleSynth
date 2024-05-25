@@ -25,4 +25,17 @@
 #ifndef _MAIN_H
 #define _MAIN_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+uint8_t get_scan_button(uint8_t b);
+int uart0_input(void);
+void uart0_output(const uint8_t *data, int num);
+void idle_task(void);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif // _MAIN_H

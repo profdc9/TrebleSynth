@@ -32,9 +32,19 @@
 #include "hardware/timer.h"
 #include "hardware/sync.h"
 #include "hardware/flash.h"
+#include "hardware/uart.h"
+#include "hardware/irq.h"
 #include "pico/multicore.h"
 
 #define DMB() __dmb()
+
+#define UART_TX_PIN 0
+#define UART_RX_PIN 1
+
+#define DAC_PWM_A3 15
+#define DAC_PWM_A2 14
+#define DAC_PWM_A1 13
+#define DAC_PWM_A0 12
 
 #define DAC_PWM_B3 15
 #define DAC_PWM_B2 14
@@ -43,8 +53,9 @@
 
 #define DAC_PWM_WRAP_VALUE 0x400
 
-#define ADC_AUDIO_IN 26
-#define ADC_CONTROL_IN 27
+#define ADC_A1 26
+#define ADC_A2 27
+#define ADC_A3 28
 #define ADC_MAX_VALUE 4096
 #define ADC_PREC_VALUE 16384
 
@@ -56,7 +67,6 @@
 #define GPIO_BUTTON2 20
 #define GPIO_BUTTON3 21
 #define GPIO_BUTTON4 22
-#define GPIO_BUTTON5 28
 
 #define DSP_SAMPLERATE 25000u
 #define POT_MAX_VALUE 16384u

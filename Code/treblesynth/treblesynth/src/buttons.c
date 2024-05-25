@@ -1,13 +1,14 @@
 
+#include <stdint.h>
+#include "main.h"
 #include "treblesynth.h"
 #include "buttons.h"
 #include "hardware/timer.h"
 
-#define NUM_BUTTONS 5
-
-const uint buttons_pad[NUM_BUTTONS] = { GPIO_BUTTON1, GPIO_BUTTON2, GPIO_BUTTON3, GPIO_BUTTON4, GPIO_BUTTON5 };
+#define NUM_BUTTONS 32
 
 static bool _button_pressed[NUM_BUTTONS];
+static bool _state_changed[NUM_BUTTONS];
 static uint8_t _state_count[NUM_BUTTONS];
 static uint8_t _last_state[NUM_BUTTONS];
 static uint8_t _repeated_state[NUM_BUTTONS];
@@ -17,18 +18,15 @@ const uint8_t repeat_states_next_ctr = 20;
 
 void buttons_initialize(void)
 {
-	for (uint8_t i=0; i<NUM_BUTTONS;i++) {
-		gpio_init(buttons_pad[i]);
-		gpio_set_dir(buttons_pad[i], GPIO_IN);
-		gpio_pull_up(buttons_pad[i]);
-		_button_pressed[i] = false;
-	}
 }
 
 void buttons_clear()
 {
   for (uint8_t i=0; i<NUM_BUTTONS; i++)
+  {
     _button_pressed[i] = false;
+    _state_changed[i] = false;
+  }
 }
 
 void buttons_poll()
@@ -41,7 +39,7 @@ void buttons_poll()
    
   for (uint8_t i=0; i<NUM_BUTTONS; i++)
   {
-     uint8_t state = gpio_get(buttons_pad[i]) != 0;
+     uint8_t state = get_scan_button(i) != 0;
      if (state == _last_state[i])
      {
         _state_count[i] = 0;
@@ -57,6 +55,7 @@ void buttons_poll()
      {  if (_state_count[i] > 10)
         {
            _state_count[i] = 0;
+           _state_changed[i] = true;
            _repeated_state[i] = repeat_states_init_ctr;
            _last_state[i] = state;
            if ((!state) && (!_button_pressed[i]))
@@ -86,7 +85,7 @@ bool button_waitpressed(uint8_t b)
 
 uint8_t button_readunbounced(uint8_t b)
 {
-  return (gpio_get(buttons_pad[b]) == 0);
+  return (get_scan_button(b) == 0);
 }
 
 uint8_t button_readbutton(uint8_t b)
@@ -94,3 +93,15 @@ uint8_t button_readbutton(uint8_t b)
   return !(_last_state[b]);
 }
 
+uint8_t button_get_state_changed(void)
+{
+  for (uint8_t i=0; i<NUM_BUTTONS; i++)
+  {
+     if (_state_changed[i])
+     {
+         _state_changed[i] = false;
+         return _last_state[i] ? i : (i | 0x80);
+     }
+  }
+  return BUTTONS_NO_CHANGE;
+}
