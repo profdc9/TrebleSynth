@@ -285,7 +285,25 @@ void scroll_number_key(scroll_number_dat *snd)
       snd->n -= p10;
       snd->changed = 1;
     }
-  } else redraw = 0;
+  } else
+  {
+    redraw = 0;
+    if (snd->keypos)
+    {
+        for (int i=7;i<NUM_BUTTONS;i++)
+            if (getbuttonpressed(i))
+            {
+                i -= 6;
+                if ((i>=snd->minimum_number) && (i <= snd->maximum_number))
+                {
+                    snd->n = i;
+                    snd->changed = 1;
+                    redraw = 1;
+                }
+                break;
+            }
+    }
+  }
   if (redraw)
     scroll_number_redraw(snd);
 }

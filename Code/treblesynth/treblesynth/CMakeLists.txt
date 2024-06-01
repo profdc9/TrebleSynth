@@ -3,8 +3,8 @@ add_executable(treblesynth
     src/ssd1306_i2c.c
     src/buttons.c
     src/dsp.c
+    src/synth.c
     src/ui.c
-    src/pitch.c
     src/tinycl.cpp
     src/usbmain.c
     src/usb_descriptors.c

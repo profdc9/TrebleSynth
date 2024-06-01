@@ -15,6 +15,8 @@ uint8_t button_readunbounced(uint8_t b);
 uint8_t button_readbutton(uint8_t b);
 uint8_t button_get_state_changed(void);
 
+#define NUM_BUTTONS 32
+
 #define BUTTONS_NO_CHANGE 255
 
 #ifdef __cplusplus

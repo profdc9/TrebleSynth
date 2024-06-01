@@ -30,6 +30,12 @@ extern "C"
 {
 #endif
 
+#define DSP_SAMPLERATE 25000u
+
+#define QUANTIZATION_BITS 15
+#define QUANTIZATION_MAX (1<<QUANTIZATION_BITS)
+#define QUANTIZATION_MAX_FLOAT ((float)(1<<QUANTIZATION_BITS))
+
 #define MAX_DSP_UNITS 16
 
 #define MATH_PI_F 3.1415926535f
@@ -746,6 +752,34 @@ void dsp_set_value_prec(void *v, int prec, uint32_t val);
 
 void dsp_unit_reset(int dsp_unit_number);
 void dsp_unit_reset_all(void);
+
+/************Float to quantized integer offset instructions *******************************/
+
+inline float nyquist_fraction_omega(uint16_t frequency)
+{
+    return ((float)frequency)*(2.0f*MATH_PI_F/((float)DSP_SAMPLERATE));
+}
+
+inline float Q_value(uint16_t Q)
+{
+    return (((float)Q)*0.01f);
+}
+
+/* Q = 100 means Q scaled to one */
+inline float float_a_value(float omega_value, uint16_t Q)
+{
+    return sinf(omega_value)*(50.0f)/((float)Q);
+}
+
+inline int32_t float_to_sampled_int(float x)
+{
+    return (int32_t)(QUANTIZATION_MAX_FLOAT*x+0.5f);
+}
+
+inline int16_t fractional_int_remove_offset(int32_t x)
+{
+    return (int32_t)(x/QUANTIZATION_MAX);
+}
 
 #ifdef __cplusplus
 }

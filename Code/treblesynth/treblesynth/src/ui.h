@@ -55,6 +55,7 @@ typedef struct _scroll_number_dat
   uint8_t     decs;
   uint32_t    minimum_number;
   uint32_t    maximum_number;
+  uint8_t     keypos;
 
   uint8_t     position;
   uint32_t    n;

@@ -31,19 +31,24 @@
 #include "ssd1306_i2c.h"
 #include "buttons.h"
 #include "dsp.h"
-#include "pitch.h"
+#include "synth.h"
 #include "ui.h"
 #include "tinycl.h"
 
 #include "usbmain.h"
 
 #define NUMBER_OF_CONTROLS 24
+#define CONTROL_VALUE_LENGTH 16
 
 uint16_t current_samples[NUMBER_OF_CONTROLS];
 uint16_t samples[NUMBER_OF_CONTROLS];
+uint16_t changed_samples[NUMBER_OF_CONTROLS];
 uint16_t last_samples[NUMBER_OF_CONTROLS];
-uint control_direction[NUMBER_OF_CONTROLS];
-uint control_enabled[NUMBER_OF_CONTROLS];
+bool sample_changed[NUMBER_OF_CONTROLS];
+bool control_direction[NUMBER_OF_CONTROLS];
+bool control_enabled[NUMBER_OF_CONTROLS];
+
+char control_value[NUMBER_OF_CONTROLS][CONTROL_VALUE_LENGTH];
 
 uint current_input;
 uint control_sample_no;
@@ -52,9 +57,8 @@ const int potentiometer_mapping[23] = { 1,2,3,4,6,7,5,10,9,8,11,12,14,15,13,18,1
 
 uint32_t mag_avg;
 
-uint     button_state[8*4];
+uint button_state[8*4];
 const uint button_ind[32] = { 29,25,30,28,31,27,26,  2,1,0,3,4,6,7,5,  10,9,8,11,12,14,15,13, 18,17,16,19,20,22,23,21,24   };
-
 void initialize_video(void);
 void halt_video(void);
 
@@ -66,10 +70,16 @@ uint claimed_alarm_num = UNCLAIMED_ALARM;
 
 volatile uint32_t counter = 0;
 
+bool pause_poll_keyboard = false;
+bool pause_poll_controls = false;
+
+void update_control_values(void);
+
 void keyboard_poll(void)
 {
     uint8_t button_no;
     
+    if (pause_poll_keyboard) return;
     while ((button_no=button_get_state_changed()) != BUTTONS_NO_CHANGE)
     {
         uint8_t button_on_off = (button_no & 0x80);
@@ -79,41 +89,71 @@ void keyboard_poll(void)
     }
 }
 
+void controls_poll(void)
+{
+    char bar[17];
+    int val, pos;
+    if (pause_poll_controls) return;
+    for (uint c=1;c<((sizeof(potentiometer_mapping)/sizeof(potentiometer_mapping[0])));c++)
+    {
+        int m = potentiometer_mapping[c-1];
+        if ((control_value[c][0] != '\000') && (control_value[c][0] != ' ') && (sample_changed[m]))
+        {
+            pos = 0;
+            val = current_samples[m];
+            while (val >= (ADC_MAX_VALUE/16))
+            {
+                bar[pos++] = 0x8;
+                val -= (ADC_MAX_VALUE/16);
+            }
+            bar[pos++] = (val*8)/(ADC_MAX_VALUE/16);
+            bar[pos] = 0;
+            write_str_with_spaces(0,7,bar,16);
+            write_str_with_spaces(0,6,control_enabled[m] ? "*" : (control_direction[m] ? "<" : ">"),1);
+            write_str_with_spaces(1,6,control_value[c],14);
+            sample_changed[m] = false;
+            display_refresh();
+            return;
+        }
+    }
+}
+
 #define UART_FIFO_SIZE 256
 
 typedef struct _uart_fifo
 {
     uint head;
     uint tail;
-    critical_section cs;
     uint8_t buf[UART_FIFO_SIZE];
 } uart_fifo;
 
 uart_fifo uart_fifo_input;
 uart_fifo uart_fifo_output;
+critical_section uart_cs;
 
 void initialize_uart_fifo(uart_fifo *uf)
 {
-    critical_section_init(&uf->cs);
+    critical_section_enter_blocking(&uart_cs);
     uf->head = uf->tail = 0;
+    critical_section_exit(&uart_cs);
 }
 
 void insert_into_uart_fifo(uart_fifo *uf, uint8_t ch)
 {
-    critical_section_enter_blocking(&uf->cs);
+    critical_section_enter_blocking(&uart_cs);
     uint nexthead = uf->head >= (UART_FIFO_SIZE-1) ? 0 : (uf->head+1);
     if (nexthead != uf->tail)
     {
         uf->buf[uf->head] = ch;
         uf->head = nexthead;
     }
-    critical_section_exit(&uf->cs);
+    critical_section_exit(&uart_cs);
 }
 
 int remove_from_uart_fifo(uart_fifo *uf)
 {
     int ret;
-    critical_section_enter_blocking(&uf->cs);
+    critical_section_enter_blocking(&uart_cs);
     if (uf->tail == uf->head) 
         ret = -1;
     else 
@@ -121,7 +161,7 @@ int remove_from_uart_fifo(uart_fifo *uf)
         ret = uf->buf[uf->tail];
         uf->tail = uf->tail >= (UART_FIFO_SIZE-1) ? 0 : (uf->tail+1);
     }
-    critical_section_exit(&uf->cs);
+    critical_section_exit(&uart_cs);
     return ret;
 }
 
@@ -158,6 +198,7 @@ void uart0_irq_handler(void)
 
 void initialize_uart(void)
 {
+    critical_section_init(&uart_cs);
     irq_set_enabled(UART0_IRQ, false);
     initialize_uart_fifo(&uart_fifo_input);
     initialize_uart_fifo(&uart_fifo_output);
@@ -177,10 +218,11 @@ void initialize_uart(void)
 
 void idle_task(void)
 {
-    buttons_poll();
-    midi_uart_poll();
-    keyboard_poll();
     usb_task();
+    midi_uart_poll();
+    buttons_poll();
+    keyboard_poll();
+    controls_poll();
 }
 
 void initialize_pwm(void)
@@ -312,21 +354,23 @@ void manually_poll_analog_controls(void)
             current_samples[ci+csn*8] = adc_hw->result;
        }
    }
+   select_control(0,0);
 }
 
 void reset_control_samples(uint16_t *reset_samples)
 {
+    memset(sample_changed,'\000',sizeof(sample_changed));
     if (reset_samples == NULL) 
     {
         for (uint n=0;n<NUMBER_OF_CONTROLS;n++)
-            control_enabled[n] = 1;
+            control_enabled[n] = true;
         return;
     }        
     memcpy(last_samples, reset_samples, sizeof(last_samples));
     manually_poll_analog_controls();
     for (uint n=0;n<NUMBER_OF_CONTROLS;n++)
     {
-        control_enabled[n] = 0;
+        control_enabled[n] = false;
         control_direction[n] = current_samples[n] < last_samples[n];
         samples[n] = last_samples[n];
     }
@@ -336,7 +380,14 @@ inline void poll_controls(void)
 {
    uint current_sample_no = current_input+control_sample_no*8;
    uint16_t sample = adc_hw->result;
-   
+
+   if ( (sample > (current_samples[current_sample_no] + POTENTIOMETER_VALUE_SENSITIVITY)) || 
+        (current_samples[current_sample_no] > (sample + POTENTIOMETER_VALUE_SENSITIVITY)) )
+   {
+       sample_changed[current_sample_no] = true;
+       current_samples[current_sample_no] = sample;
+   }
+
    if (control_enabled[current_sample_no])
        samples[current_sample_no] = sample;
    else
@@ -345,7 +396,7 @@ inline void poll_controls(void)
             ((!control_direction[current_sample_no]) && (sample <= last_samples[current_sample_no])) )
             {
                 samples[current_sample_no] = sample;
-                control_enabled[current_sample_no] = 1;
+                control_enabled[current_sample_no] = true;
             }
    }
    
@@ -354,7 +405,7 @@ inline void poll_controls(void)
    button_state[current_input+16] = gpio_get(GPIO_BUTTON3);
    button_state[current_input+24] = gpio_get(GPIO_BUTTON4);
    
-   current_input = (current_input >= 7) ? 0 : (current_input+1);
+   current_input = (current_input + 1) & 0x07;
    gpio_put(GPIO_ADC_SEL0, (current_input & 0x01) == 0);
    gpio_put(GPIO_ADC_SEL1, (current_input & 0x02) == 0);
    gpio_put(GPIO_ADC_SEL2, (current_input & 0x04) == 0);
@@ -403,7 +454,6 @@ void reset_periodic_alarm(uint16_t *reset_samples)
     hardware_alarm_cancel(claimed_alarm_num);
     control_sample_no = 0;
     current_input = 0;
-    select_control(0,0);
     reset_control_samples(reset_samples);
     hardware_alarm_set_callback(claimed_alarm_num, alarm_func);
     last_time = make_timeout_time_us(1000);
@@ -412,6 +462,11 @@ void reset_periodic_alarm(uint16_t *reset_samples)
     hardware_alarm_set_target(claimed_alarm_num, next_alarm_time);
 }
 
+void reset_load_controls(void)
+{
+    update_control_values();
+    reset_periodic_alarm(samples);
+}
 
 void initialize_periodic_alarm(uint16_t *reset_samples)
 {
@@ -467,7 +522,7 @@ char buttonpressed(uint8_t b)
     return button_readbutton(b) ? '1' : '0';
 }
 
-void adjust_parms(uint8_t unit_no)
+void adjust_dsp_parms_unit(uint8_t unit_no)
 {
     int sel = 0, redraw = 1;
     button_clear();
@@ -539,6 +594,7 @@ void adjust_parms(uint8_t unit_no)
                                           d[sel-1].minval,
                                           d[sel-1].maxval,
                                           0,
+                                          0,
                                           dsp_read_value_prec((void *)(((uint8_t *)&dsp_parms[unit_no]) + d[sel-1].offset), d[sel-1].size),
                                           0, 0 };
                 scroll_number_start(&snd);
@@ -593,19 +649,156 @@ void adjust_dsp_params(void)
         {
            sprintf(s,"Unit #%d select", unit_no+1);
            write_str_with_spaces(0,1,s,16);
-           adjust_parms(unit_no);
+           adjust_dsp_parms_unit(unit_no);
            redraw = 1;
         }
     }
 }
 
-int main2();
+void adjust_synth_parms_unit(uint8_t unit_no)
+{
+    int sel = 0, redraw = 1;
+    button_clear();
+    for (;;)
+    {
+        const synth_parm_configuration_entry *sp = spce[synth_parms[unit_no].stn.sut];
+        idle_task();
+        if (redraw)
+        {
+            if (sel == 0)
+            {
+                write_str_with_spaces(0,2,"Type",16);
+                write_str_with_spaces(0,3,stnames[synth_parms[unit_no].stn.sut],16);
+            } else
+            {
+                char s[20];
+                write_str_with_spaces(0,2,sp[sel-1].desc,16);
+                char *c = number_str(s, 
+                    synth_read_value_prec((void *)(((uint8_t *)&synth_parms[unit_no]) + sp[sel-1].offset), sp[sel-1].size), 
+                    sp[sel-1].digits, 0);
+                write_str_with_spaces(0,3,c,16);
+            }
+            display_refresh();
+            redraw = 0;            
+        }
+        if (button_left())
+        {
+            button_clear();
+            break;
+        }
+        else if (button_down() && (sel > 0))
+        {
+            sel--;
+            redraw = 1;
+        } else if (button_up())
+        {
+            if (sp[sel].desc != NULL)
+            {
+                sel++;
+                redraw = 1;
+            }
+        } else if (button_right() || button_enter())
+        {
+            if (sel == 0)
+            {
+                write_str_with_spaces(0,2,"Type select",16);
+                menu_str mst = { stnames,0,3,10,0,0 };
+                mst.item = mst.itemesc = synth_parms[unit_no].stn.sut;
+                int res;
+                do_show_menu_item(&mst);
+                do
+                {
+                    idle_task();
+                    res = do_menu(&mst);
+                } while (res == 0);
+                if (res == 3)
+                {
+                    if (mst.item != synth_parms[unit_no].stn.sut)
+                    {
+                        synth_unit_initialize(unit_no, (synth_unit_type)mst.item);
+                        synth_unit_reset_all();
+                    }
+                }
+            } else
+            {
+                uint8_t control = sp[sel-1].controldesc != NULL;
+                scroll_number_dat snd = { 0, 3, 
+                                          sp[sel-1].digits,
+                                          0,
+                                          sp[sel-1].minval,
+                                          sp[sel-1].maxval,
+                                          control,
+                                          0,
+                                          synth_read_value_prec((void *)(((uint8_t *)&synth_parms[unit_no]) + sp[sel-1].offset), sp[sel-1].size),
+                                          0, 0 };
+                scroll_number_start(&snd);
+                if (control) pause_poll_keyboard = true;
+                buttons_clear();
+                do
+                {
+                    idle_task();
+                    scroll_number_key(&snd);
+                } while (!snd.entered);
+                pause_poll_keyboard = false;
+                buttons_clear();
+                if (snd.changed)
+                {
+                   synth_set_value_prec((void *)(((uint8_t *)&synth_parms[unit_no]) + sp[sel-1].offset), sp[sel-1].size, snd.n);
+                   update_control_values();
+                }
+            }
+            redraw = 1;
+        }
+    }
+}
+
+void adjust_synth_params(void)
+{
+    int unit_no = 0, redraw = 1;
+    char s[20];
+
+    button_clear();
+    for (;;)
+    {
+        idle_task();
+        if (redraw)
+        {
+            clear_display();
+            write_str(0,0,"Synth Adj");
+            sprintf(s,"Unit #%d", unit_no+1);
+            write_str_with_spaces(0,1,s,16);
+            write_str_with_spaces(0,2,stnames[synth_parms[unit_no].stn.sut],16);
+            display_refresh();
+            redraw = 0;
+        }
+        if (button_left())
+        {
+            button_clear();
+            break;
+        }
+        else if (button_down() && (unit_no > 0))
+        {
+            unit_no--;
+            redraw = 1;
+        } else if (button_up() && (unit_no < (MAX_SYNTH_UNITS-1)))
+        {
+            unit_no++;
+            redraw = 1;
+        } else if (button_right() || button_enter())
+        {
+           sprintf(s,"Unit #%d select", unit_no+1);
+           write_str_with_spaces(0,1,s,16);
+           adjust_synth_parms_unit(unit_no);
+           redraw = 1;
+        }
+    }
+}
 
 #define FLASH_BANKS 10
 #define FLASH_PAGE_BYTES 4096u
 #define FLASH_OFFSET_STORED (2*1024*1024)
 #define FLASH_BASE_ADR 0x10000000
-#define FLASH_MAGIC_NUMBER 0xFEE1FEDE
+#define FLASH_MAGIC_NUMBER 0xFEE1FED3
 
 #define FLASH_PAGES(x) ((((x)+(FLASH_PAGE_BYTES-1))/FLASH_PAGE_BYTES)*FLASH_PAGE_BYTES)
 
@@ -619,7 +812,9 @@ typedef struct _flash_layout_data
     uint32_t magic_number;
     uint32_t gen_no;
     uint8_t  desc[16];
+    uint16_t samples[NUMBER_OF_CONTROLS];
     dsp_parm dsp_parms[MAX_DSP_UNITS];
+    synth_parm synth_parms[MAX_SYNTH_UNITS];
 } flash_layout_data;
 
 typedef union _flash_layout
@@ -758,8 +953,11 @@ int flash_load_bank(uint bankno)
         if (fl->fld.gen_no > last_gen_no)
             last_gen_no = fl->fld.gen_no;
         memcpy(desc, fl->fld.desc, sizeof(desc));
+        memcpy((void *)samples, (void *) &fl->fld.samples, sizeof(samples));
         memcpy((void *)dsp_parms, (void *) &fl->fld.dsp_parms, sizeof(dsp_parms));
+        memcpy((void *)synth_parms, (void *) &fl->fld.synth_parms, sizeof(synth_parms));
         dsp_unit_reset_all();
+        synth_unit_reset_all();
     } else return -1;
     return 0;
 }
@@ -814,7 +1012,14 @@ int flash_load(void)
 {
     uint bankno;
     if ((bankno = select_bankno(1)) == 0) return -1;
-    message_to_display(flash_load_bank(bankno-1) ? "Not Loaded" : "Loaded");
+    if (flash_load_bank(bankno-1))
+    {
+        message_to_display("Not Loaded");
+    } else
+    {
+        reset_load_controls();
+        message_to_display("Loaded");
+    }
     return 0;
 }
 
@@ -838,7 +1043,11 @@ void flash_load_most_recent(void)
             }
         }
     }
-    if (load_bankno < FLASH_BANKS) flash_load_bank(load_bankno);
+    if (load_bankno < FLASH_BANKS) 
+    {
+        if (!flash_load_bank(load_bankno))
+            reset_load_controls();
+    }
 }
 
  const uint8_t validchars[] = { ' ', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 
@@ -854,7 +1063,9 @@ int flash_save_bank(uint bankno)
     fl->fld.magic_number = FLASH_MAGIC_NUMBER;
     fl->fld.gen_no = (++last_gen_no);
     memcpy(fl->fld.desc, desc, sizeof(fl->fld.desc));
+    memcpy(fl->fld.samples, samples, sizeof(fl->fld.samples));
     memcpy((void *)&fl->fld.dsp_parms, (void *)dsp_parms, sizeof(fl->fld.dsp_parms));
+    memcpy((void *)&fl->fld.synth_parms, (void *)synth_parms, sizeof(fl->fld.synth_parms));
     int ret = write_data_to_flash(flash_offset_bank(bankno), (uint8_t *) fl, 1, sizeof(flash_layout));
     free(fl);
     return ret;
@@ -878,105 +1089,6 @@ void flash_save(void)
     write_str_with_spaces(0,4,"",15);
     message_to_display(flash_save_bank(bankno-1) ? "Save Failed" : "Save Succeeded");      
 }
-
-bool pitch_poll(bool do_play_note, uint32_t *hz, int32_t *note_no)
-{
-    static uint32_t mag_note_thr = 0;
-    static bool playing_note = false;
-    static bool another_note = true;
-    static int32_t min_offset = PITCH_MIN_OFFSET;
-   
-    uint32_t cur_mag_avg = mag_avg;
-    bool note_event = false;
-    
-    if (pitch_current_entry >= NUM_PITCH_EDGES)
-    {
-        pitch_edge_autocorrelation();
-        pitch_buffer_reset();
-        int32_t entry = pitch_autocorrelation_max(min_offset);
-        if (entry >= 0)
-        {
-            uint32_t hzn = pitch_estimate_peak_hz(entry);
-            if (hzn > 0)
-            {
-                min_offset = pitch_autocor[entry].offset / 2;
-                int32_t note_no_n = pitch_find_note(hzn);
-                if ((note_no_n >= 0) && (another_note))
-                {
-                    *note_no = note_no_n;
-                    mag_note_thr = cur_mag_avg*3/4;
-                    *hz = hzn;
-                    note_event = true;
-                    if (do_play_note)
-                    {
-                        gpio_put(LED_PIN, 1);
-                        uint32_t velocity = cur_mag_avg / (16 * ADC_PREC_VALUE / 128);
-                        if (velocity > 127) velocity = 127;
-                        midi_send_note(note_no_n+24, velocity);
-                    }
-                    playing_note = true;
-                    another_note = false;
-                }
-            }
-        }
-    }
-    if (cur_mag_avg < mag_note_thr) 
-        another_note = true;
-    if (cur_mag_avg < (512*40))
-    {
-        min_offset = PITCH_MIN_OFFSET;
-        //pitch_buffer_reset();
-        if (playing_note)
-        {
-            note_event = true;
-            if (do_play_note) 
-            {
-               gpio_put(LED_PIN, 0);
-               midi_send_note(0,0);
-            }
-            playing_note = false;
-            another_note = true;
-            mag_note_thr = 0;
-        }
-    }    
-    return note_event;
-}
-
-void pitch_measure(void)
-{
-
-    char str[80];
-    bool endloop = false;
-    uint32_t last_time = 0, hz = 0;
-    int32_t note_no = -1;
-  
-    clear_display();
-    pitch_buffer_reset();
-    buttons_clear();
-    
-    while (!endloop)
-    {
-        idle_task();
-        if (button_enter() || button_left()) 
-        {
-            endloop = true;
-            break;
-        }
-        pitch_poll(true, &hz, &note_no);
-        if ((time_us_32() - last_time) > 250000)
-        {
-            last_time = time_us_32();
-            sprintf(str,"Hz: %u",hz);
-            write_str_with_spaces(0,0,str,16);
-            sprintf(str,"Nt: %s %u", note_no < 0 ? "None" : notes[note_no].note, note_no < 0 ? 0 : notes[note_no].frequency_hz);
-            write_str_with_spaces(0,1,str,16);
-            display_refresh();
-        }
-    }
-    midi_send_note(0,0);
-    gpio_put(LED_PIN, 0);
-}
-
 
 void debugstuff(void)
 {
@@ -1006,11 +1118,10 @@ void debugstuff(void)
         ssd1306_set_cursor(0,5);
         ssd1306_printstring(str);
         ssd1306_render();
-        uart0_output((uint8_t *)&counter, 2);
     }
 }
 
-const char * const mainmenu[] = { "Adjust", "Pitch", "Debug", "Pedal", "Load", "Save", NULL };
+const char * const mainmenu[] = { "SynthAdj", "FiltAdjust", "Debug", "Pedal", "Load", "Save", NULL };
 
 menu_str mainmenu_str = { mainmenu, 0, 2, 15, 0, 0 };
 
@@ -1023,17 +1134,17 @@ int test_cmd(int args, tinycl_parameter* tp, void *v)
   return 1;
 }
 
-void type_cmd_write(uint unit_no, dsp_unit_type dut)
+void e_type_cmd_write(uint unit_no, dsp_unit_type dut)
 {
   char s[40];
   if (dut >= DSP_TYPE_MAX_ENTRY) return;
-  sprintf(s,"INIT %u %u ",unit_no+1, (uint)dut);
+  sprintf(s,"EINIT %u %u ",unit_no+1, (uint)dut);
   tinycl_put_string(s);
   tinycl_put_string(dtnames[(uint)dut]);
   tinycl_put_string("\r\n");    
 }
 
-int type_cmd(int args, tinycl_parameter* tp, void *v)
+int etype_cmd(int args, tinycl_parameter* tp, void *v)
 {
   uint unit_no=tp[0].ti.i;
   dsp_unit_type dut = DSP_TYPE_NONE;
@@ -1043,7 +1154,7 @@ int type_cmd(int args, tinycl_parameter* tp, void *v)
       do
       {
           dut = dsp_unit_get_type(unit_no);
-          type_cmd_write(unit_no, dut);
+          e_type_cmd_write(unit_no, dut);
           unit_no++;
       } while (dut < DSP_TYPE_MAX_ENTRY);
       return 1;
@@ -1051,11 +1162,11 @@ int type_cmd(int args, tinycl_parameter* tp, void *v)
   unit_no--;
   dut = dsp_unit_get_type(unit_no);
   if (dut < DSP_TYPE_MAX_ENTRY)
-      type_cmd_write(unit_no, dut);
+      e_type_cmd_write(unit_no, dut);
   return 1;
 }
 
-int init_cmd(int args, tinycl_parameter* tp, void *v)
+int einit_cmd(int args, tinycl_parameter* tp, void *v)
 {
   uint unit_no=tp[0].ti.i;
   uint type_no=tp[1].ti.i;  
@@ -1068,11 +1179,11 @@ int init_cmd(int args, tinycl_parameter* tp, void *v)
   return 1;
 }
 
-void conf_entry_print(uint unit_no, const dsp_parm_configuration_entry *dpce)
+void e_conf_entry_print(uint unit_no, const dsp_parm_configuration_entry *dpce)
 {
     uint32_t value;
     char s[60];
-    sprintf(s,"SET %u ",unit_no+1);
+    sprintf(s,"ESET %u ",unit_no+1);
     tinycl_put_string(s);    
     tinycl_put_string(dpce->desc);
     if (!dsp_unit_get_value(unit_no, dpce->desc, &value)) value = 0;
@@ -1080,15 +1191,15 @@ void conf_entry_print(uint unit_no, const dsp_parm_configuration_entry *dpce)
     tinycl_put_string(s);
 }
 
- const dsp_parm_configuration_entry *conf_entry_lookup_print(uint unit_no, uint entry_no)
+ const dsp_parm_configuration_entry *e_conf_entry_lookup_print(uint unit_no, uint entry_no)
  {
     const dsp_parm_configuration_entry *dpce = dsp_unit_get_configuration_entry(unit_no, entry_no);
     if (dpce == NULL) return NULL;
-    conf_entry_print(unit_no, dpce);
+    e_conf_entry_print(unit_no, dpce);
     return dpce;
  }
 
-int conf_cmd(int args, tinycl_parameter* tp, void *v)
+int econf_cmd(int args, tinycl_parameter* tp, void *v)
 {
   uint unit_no=tp[0].ti.i;
   uint entry_no=tp[1].ti.i;
@@ -1099,19 +1210,19 @@ int conf_cmd(int args, tinycl_parameter* tp, void *v)
     if (entry_no == 0)
     {
         dsp_unit_type dut = dsp_unit_get_type(unit_no);
-        type_cmd_write(unit_no, dut);    
-        while (conf_entry_lookup_print(unit_no, entry_no) != NULL) entry_no++;
+        e_type_cmd_write(unit_no, dut);    
+        while (e_conf_entry_lookup_print(unit_no, entry_no) != NULL) entry_no++;
     } else
-        conf_entry_lookup_print(unit_no, entry_no-1);
+        e_conf_entry_lookup_print(unit_no, entry_no-1);
   } else
   {
     for (;;)
     {
        dsp_unit_type dut = dsp_unit_get_type(unit_no);
        if (dut >= DSP_TYPE_MAX_ENTRY) break;
-       type_cmd_write(unit_no, dut);    
+       e_type_cmd_write(unit_no, dut);    
        entry_no = 0;
-       while (conf_entry_lookup_print(unit_no, entry_no) != NULL) entry_no++;
+       while (e_conf_entry_lookup_print(unit_no, entry_no) != NULL) entry_no++;
        unit_no++;
     }
   }
@@ -1119,7 +1230,7 @@ int conf_cmd(int args, tinycl_parameter* tp, void *v)
   return 1;
 }
 
-int set_cmd(int args, tinycl_parameter* tp, void *v)
+int eset_cmd(int args, tinycl_parameter* tp, void *v)
 {
   uint unit_no=tp[0].ti.i;
   const char *parm = tp[1].ts.str;
@@ -1129,13 +1240,170 @@ int set_cmd(int args, tinycl_parameter* tp, void *v)
   return 1;
 }
 
-int get_cmd(int args, tinycl_parameter* tp, void *v)
+int eget_cmd(int args, tinycl_parameter* tp, void *v)
 {
   uint unit_no=tp[0].ti.i;
   const char *parm = tp[1].ts.str;
   uint32_t value;
     
   if ((unit_no > 0) && dsp_unit_get_value(unit_no-1, parm, &value))
+  {
+      char s[40];
+      sprintf(s,"%u\r\n",value);
+      tinycl_put_string(s);
+  } else
+      tinycl_put_string("Error\r\n");
+  return 1;
+}
+
+void s_type_cmd_write(uint unit_no, synth_unit_type sut)
+{
+  char s[40];
+  if (sut >= SYNTH_TYPE_MAX_ENTRY) return;
+  sprintf(s,"SINIT %u %u ",unit_no+1, (uint)sut);
+  tinycl_put_string(s);
+  tinycl_put_string(stnames[(uint)sut]);
+  tinycl_put_string("\r\n");    
+}
+
+int stype_cmd(int args, tinycl_parameter* tp, void *v)
+{
+  uint unit_no=tp[0].ti.i;
+  synth_unit_type sut = SYNTH_TYPE_NONE;
+  
+  if (unit_no == 0)
+  {
+      do
+      {
+          sut = synth_unit_get_type(unit_no);
+          s_type_cmd_write(unit_no, sut);
+          unit_no++;
+      } while (sut < SYNTH_TYPE_MAX_ENTRY);
+      return 1;
+  }
+  unit_no--;
+  sut = synth_unit_get_type(unit_no);
+  if (sut < SYNTH_TYPE_MAX_ENTRY)
+      s_type_cmd_write(unit_no, sut);
+  return 1;
+}
+
+int sinit_cmd(int args, tinycl_parameter* tp, void *v)
+{
+  uint unit_no=tp[0].ti.i;
+  uint type_no=tp[1].ti.i;  
+  
+  if (unit_no > 0)
+  {
+    synth_unit_initialize(unit_no-1, (synth_unit_type) type_no);
+    synth_unit_reset_all();
+  }
+  return 1;
+}
+
+void s_conf_entry_print(uint unit_no, const synth_parm_configuration_entry *spce)
+{
+    uint32_t value;
+    char s[60];
+    sprintf(s,"SSET %u ",unit_no+1);
+    tinycl_put_string(s);    
+    tinycl_put_string(spce->desc);
+    if (!synth_unit_get_value(unit_no, spce->desc, &value)) value = 0;
+    sprintf(s," %u %u %u\r\n",value,spce->minval,spce->maxval);
+    tinycl_put_string(s);
+}
+
+const synth_parm_configuration_entry *s_conf_entry_lookup_print(uint unit_no, uint entry_no)
+ {
+    const synth_parm_configuration_entry *spce = synth_unit_get_configuration_entry(unit_no, entry_no);
+    if (spce == NULL) return NULL;
+    s_conf_entry_print(unit_no, spce);
+    return spce;
+ }
+
+void update_control_values(void)
+{
+    int unit_no = 0, entry_no;
+    uint32_t value;
+    
+    memset(control_value,'\000',sizeof(control_value));
+    for (;;)
+    {
+        synth_unit_type sut = synth_unit_get_type(unit_no);
+        if (sut >= SYNTH_TYPE_MAX_ENTRY) break;
+        entry_no = 0;
+        for (;;)
+        {
+          const synth_parm_configuration_entry *spce = synth_unit_get_configuration_entry(unit_no, entry_no);
+          if (spce == NULL) break;
+          if (spce->controldesc != NULL)
+          {
+            if (synth_unit_get_value(unit_no, spce->desc, &value))
+            {
+                if ((value >= 1) && (value <= ((sizeof(potentiometer_mapping)/sizeof(potentiometer_mapping[0])))))
+                {
+                   char s[CONTROL_VALUE_LENGTH+1];
+                   snprintf(s, CONTROL_VALUE_LENGTH, "%02d %s", unit_no+1, spce->controldesc);
+                   memcpy(control_value[value], s, CONTROL_VALUE_LENGTH);
+                }
+            }
+          }
+          entry_no++;
+        }
+        unit_no++;
+    }
+}
+
+int sconf_cmd(int args, tinycl_parameter* tp, void *v)
+{
+  uint unit_no=tp[0].ti.i;
+  uint entry_no=tp[1].ti.i;
+ 
+  if (unit_no > 0)
+  {
+    unit_no--;
+    if (entry_no == 0)
+    {
+        synth_unit_type sut = synth_unit_get_type(unit_no);
+        s_type_cmd_write(unit_no, sut);    
+        while (s_conf_entry_lookup_print(unit_no, entry_no) != NULL) entry_no++;
+    } else
+        s_conf_entry_lookup_print(unit_no, entry_no-1);
+  } else
+  {
+    for (;;)
+    {
+       synth_unit_type sut = synth_unit_get_type(unit_no);
+       if (sut >= SYNTH_TYPE_MAX_ENTRY) break;
+       s_type_cmd_write(unit_no, sut);    
+       entry_no = 0;
+       while (s_conf_entry_lookup_print(unit_no, entry_no) != NULL) entry_no++;
+       unit_no++;
+    }
+  }
+  tinycl_put_string("END 0 END\r\n");
+  return 1;
+}
+
+int sset_cmd(int args, tinycl_parameter* tp, void *v)
+{
+  uint unit_no=tp[0].ti.i;
+  const char *parm = tp[1].ts.str;
+  uint value=tp[2].ti.i;
+
+  bool isnoterr = (unit_no > 0) && synth_unit_set_value(unit_no-1, parm, value);
+  tinycl_put_string(isnoterr ? "Set\r\n" : "Error\r\n");
+  if (isnoterr) update_control_values();
+  return 1;
+}
+
+int sget_cmd(int args, tinycl_parameter* tp, void *v)
+{
+  uint unit_no=tp[0].ti.i;
+  const char *parm = tp[1].ts.str;
+  uint32_t value;
+    
+  if ((unit_no > 0) && synth_unit_get_value(unit_no-1, parm, &value))
   {
       char s[40];
       sprintf(s,"%u\r\n",value);
@@ -1202,35 +1470,6 @@ int getdesc_cmd(int args, tinycl_parameter* tp, void *v)
   return 1;
 }
 
-int a_cmd(int args, tinycl_parameter* tp, void *v)
-{
-    char s[256];
-    absolute_time_t at = get_absolute_time();
-    uint32_t l = to_us_since_boot(at);
-    pitch_edge_autocorrelation();
-    at = get_absolute_time();
-    uint32_t m = to_us_since_boot(at);
-    for (uint i=0;i<pitch_current_entry;i++)
-    {
-        sprintf(s,"%u edge: neg: %u sample: %d  counter: %d\r\n", i, pitch_edges[i].negative, pitch_edges[i].sample, pitch_edges[i].counter-pitch_edges[0].counter);
-        tinycl_put_string(s);
-    }
-    for (uint i=pitch_autocor_size;i>0;)
-    {
-        i--;
-        sprintf(s,"%u offset: %u autocor: %d", i, pitch_autocor[i].offset, pitch_autocor[i].autocor);
-        tinycl_put_string(s);
-        sprintf(s,"     %d %d %d\r\n",pitch_autocorrelation_sample(pitch_autocor[i].offset-1),
-                                 pitch_autocorrelation_sample(pitch_autocor[i].offset),
-                                 pitch_autocorrelation_sample(pitch_autocor[i].offset+1));
-        tinycl_put_string(s);
-    }
-    sprintf(s,"total us: %u\r\n", (uint32_t)(m-l));
-    tinycl_put_string(s);
-    pitch_buffer_reset();
-    return 1;
-}
-
 int help_cmd(int args, tinycl_parameter *tp, void *v);
 
 const tinycl_command tcmds[] =
@@ -1239,12 +1478,16 @@ const tinycl_command tcmds[] =
   { "SETDESC", "Set description", setdesc_cmd, TINYCL_PARM_STR, TINYCL_PARM_END },
   { "LOAD", "Load configuration", load_cmd, TINYCL_PARM_INT, TINYCL_PARM_END },
   { "SAVE", "Save configuration", save_cmd, TINYCL_PARM_INT, TINYCL_PARM_END },
-  { "GET",  "Get configuration entry", get_cmd, TINYCL_PARM_INT, TINYCL_PARM_STR, TINYCL_PARM_END },
-  { "SET",  "Set configuration entry", set_cmd, TINYCL_PARM_INT, TINYCL_PARM_STR, TINYCL_PARM_INT, TINYCL_PARM_END },
-  { "CONF", "Get configuration list", conf_cmd, TINYCL_PARM_INT, TINYCL_PARM_INT, TINYCL_PARM_END },
-  { "INIT", "Set type of effect", init_cmd, TINYCL_PARM_INT, TINYCL_PARM_INT, TINYCL_PARM_END },
-  { "TYPE", "Get type of effect", type_cmd, TINYCL_PARM_INT, TINYCL_PARM_END },
-  { "A", "Test autocorrelation", a_cmd, TINYCL_PARM_END },
+  { "EGET",  "Get effect configuration entry", eget_cmd, TINYCL_PARM_INT, TINYCL_PARM_STR, TINYCL_PARM_END },
+  { "ESET",  "Set effect configuration entry", eset_cmd, TINYCL_PARM_INT, TINYCL_PARM_STR, TINYCL_PARM_INT, TINYCL_PARM_END },
+  { "ECONF", "Get effect configuration list", econf_cmd, TINYCL_PARM_INT, TINYCL_PARM_INT, TINYCL_PARM_END },
+  { "EINIT", "Set effect type", einit_cmd, TINYCL_PARM_INT, TINYCL_PARM_INT, TINYCL_PARM_END },
+  { "ETYPE", "Get effect type", etype_cmd, TINYCL_PARM_INT, TINYCL_PARM_END },
+  { "SGET",  "Get synth configuration entry", sget_cmd, TINYCL_PARM_INT, TINYCL_PARM_STR, TINYCL_PARM_END },
+  { "SSET",  "Set synth configuration entry", sset_cmd, TINYCL_PARM_INT, TINYCL_PARM_STR, TINYCL_PARM_INT, TINYCL_PARM_END },
+  { "SCONF", "Get synth configuration list", sconf_cmd, TINYCL_PARM_INT, TINYCL_PARM_INT, TINYCL_PARM_END },
+  { "SINIT", "Set synth type", sinit_cmd, TINYCL_PARM_INT, TINYCL_PARM_INT, TINYCL_PARM_END },
+  { "STYPE", "Get synth type", stype_cmd, TINYCL_PARM_INT, TINYCL_PARM_END },
   { "TEST", "Test", test_cmd, TINYCL_PARM_INT, TINYCL_PARM_END },
   { "HELP", "Display This Help", help_cmd, {TINYCL_PARM_END } }
 };
@@ -1311,11 +1554,12 @@ void test_controls(void)
 
 int main()
 {
+    sleep_us(250000u);
+    set_sys_clock_khz(250000u, true);
     initialize_uart();
     usb_init();    
-    //stdio_init_all();
     initialize_dsp();
-    initialize_pitch();
+    synth_initialize();
     initialize_gpio();
     buttons_initialize();
     initialize_pwm();
@@ -1348,9 +1592,9 @@ int main()
         }
         switch (mainmenu_str.item)
         {
-            case 0:  adjust_dsp_params();
+            case 0:  adjust_synth_params();
                      break;
-            case 1:  pitch_measure();
+            case 1:  adjust_dsp_params();
                      break;
             case 2:  debugstuff();
                      break;

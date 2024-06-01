@@ -5,8 +5,6 @@
 #include "buttons.h"
 #include "hardware/timer.h"
 
-#define NUM_BUTTONS 32
-
 static bool _button_pressed[NUM_BUTTONS];
 static bool _state_changed[NUM_BUTTONS];
 static uint8_t _state_count[NUM_BUTTONS];

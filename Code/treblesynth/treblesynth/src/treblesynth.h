@@ -25,6 +25,8 @@
 #ifndef _TREBLESYNTH_H
 #define _TREBLESYNTH_H
 
+#define POTENTIOMETER_MAX 23
+
 #include "hardware/pio.h"
 #include "hardware/pwm.h"
 #include "hardware/adc.h"
@@ -34,6 +36,7 @@
 #include "hardware/flash.h"
 #include "hardware/uart.h"
 #include "hardware/irq.h"
+#include "pico/stdlib.h"
 #include "pico/multicore.h"
 
 #define DMB() __dmb()
@@ -68,7 +71,6 @@
 #define GPIO_BUTTON3 21
 #define GPIO_BUTTON4 22
 
-#define DSP_SAMPLERATE 25000u
 #define POT_MAX_VALUE 16384u
 
 #ifndef LED_PIN
