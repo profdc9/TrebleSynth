@@ -27,12 +27,14 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <math.h>
 
 #include "treblesynth.h"
 #include "hardware/timer.h"
 #include "tusb.h"
 #include "usbmain.h"
 #include "main.h"
+#include "synth.h"
 
 //------------- prototypes -------------//
 void cdc_task(void);
@@ -117,27 +119,6 @@ void midi_send_note(uint8_t note, uint8_t velocity)
     last_note = note;
 }
 
-void midi_button_event(uint8_t note, uint8_t on_off)
-{
-    uint8_t msg[3];
-
-    if (on_off)
-    {
-        msg[0] = 0x90;                    // Note On - Channel 1
-        msg[1] = note+36;                 // Note Number
-        msg[2] = 127;                     // Velocity
-        tud_midi_n_stream_write(0, 0, msg, 3);
-        uart0_output(msg, 3);
-    } else
-    {
-        msg[0] = 0x80;                    // Note Off - Channel 1
-        msg[1] = note+36;                 // Note Number
-        msg[2] = 127;                     // Velocity
-        tud_midi_n_stream_write(0, 0, msg, 3);
-        uart0_output(msg, 3);
-    }
-}
-
 bool midi_perform_event(const uint8_t cmdbuf[], int num)
 {
    bool ex = false;
@@ -146,15 +127,40 @@ bool midi_perform_event(const uint8_t cmdbuf[], int num)
    {
        switch (cmdprefix)
        {
-            case 0x90:  gpio_put(25,1);
+            case 0x90:  gpio_put(25,0);
+                        synth_start_note(cmdbuf[1],cmdbuf[2]);
                         ex = true;
                         break;
             case 0x80:  gpio_put(25,0);
+                        synth_stop_note(cmdbuf[1],cmdbuf[2]);
                         ex = true;
                         break;
        }
    }
    return ex;
+}
+
+void midi_button_event(uint8_t note, uint8_t on_off)
+{
+    uint8_t msg[3];
+
+    if (on_off)
+    {
+        msg[0] = 0x90;                    // Note On - Channel 1
+        msg[1] = note+pc.note_transpose;  // Note Number
+        msg[2] = 127;                     // Velocity
+        tud_midi_n_stream_write(0, 0, msg, 3);
+        uart0_output(msg, 3);
+        midi_perform_event(msg, 3);
+    } else
+    {
+        msg[0] = 0x80;                    // Note Off - Channel 1
+        msg[1] = note+pc.note_transpose;  // Note Number
+        msg[2] = 127;                     // Velocity
+        tud_midi_n_stream_write(0, 0, msg, 3);
+        uart0_output(msg, 3);
+        midi_perform_event(msg, 3);
+    }
 }
 
 void midi_uart_poll(void)

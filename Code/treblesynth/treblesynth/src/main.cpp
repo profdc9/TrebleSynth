@@ -53,12 +53,12 @@ char control_value[NUMBER_OF_CONTROLS][CONTROL_VALUE_LENGTH];
 uint current_input;
 uint control_sample_no;
 
-const int potentiometer_mapping[23] = { 1,2,3,4,6,7,5,10,9,8,11,12,14,15,13,18,17,16,19,20,22,23,21 };
+const int potentiometer_mapping[POTENTIOMETER_MAX] = { 1,2,3,4,6,7,5,10,9,8,11,12,14,15,13,18,17,16,19,20,22,23,21 };
 
 uint32_t mag_avg;
 
-uint button_state[8*4];
-const uint button_ind[32] = { 29,25,30,28,31,27,26,  2,1,0,3,4,6,7,5,  10,9,8,11,12,14,15,13, 18,17,16,19,20,22,23,21,24   };
+uint button_state[NUM_BUTTONS];
+const uint button_ind[NUM_BUTTONS] = { 29,25,30,28,31,27,26,  2,1,0,3,4,6,7,5,  10,9,8,11,12,14,15,13, 18,17,16,19,20,22,23,21,24   };
 void initialize_video(void);
 void halt_video(void);
 
@@ -74,6 +74,21 @@ bool pause_poll_keyboard = false;
 bool pause_poll_controls = false;
 
 void update_control_values(void);
+
+project_configuration pc;
+
+const project_configuration pc_default =
+{
+  PROJECT_MAGIC_NUMBER,  /* magic_number */
+  48,                    /* transpose value */
+  5000,                  /* fail delay */
+};
+
+void initialize_project_configuration(void)
+{
+    if (pc.magic_number != PROJECT_MAGIC_NUMBER)
+        memcpy((void *)&pc, (void *)&pc_default, sizeof(pc));
+}
 
 void keyboard_poll(void)
 {
@@ -91,7 +106,6 @@ void keyboard_poll(void)
 
 void controls_poll(void)
 {
-    char bar[17];
     int val, pos;
     if (pause_poll_controls) return;
     for (uint c=1;c<((sizeof(potentiometer_mapping)/sizeof(potentiometer_mapping[0])));c++)
@@ -99,18 +113,18 @@ void controls_poll(void)
         int m = potentiometer_mapping[c-1];
         if ((control_value[c][0] != '\000') && (control_value[c][0] != ' ') && (sample_changed[m]))
         {
-            pos = 0;
+            write_str_with_spaces(0,7,control_enabled[m] ? "*" : (control_direction[m] ? "<" : ">"),1);
+            write_str_with_spaces(1,7,control_value[c],14);
+
+            pos = 3;
             val = current_samples[m];
-            while (val >= (ADC_MAX_VALUE/16))
+            val = val+val/2;
+            while (val >= (ADC_MAX_VALUE/8))
             {
-                bar[pos++] = 0x8;
-                val -= (ADC_MAX_VALUE/16);
+                ssd1306_writecharXOR(pos++,7,0x8);
+                val -= (ADC_MAX_VALUE/8);
             }
-            bar[pos++] = (val*8)/(ADC_MAX_VALUE/16);
-            bar[pos] = 0;
-            write_str_with_spaces(0,7,bar,16);
-            write_str_with_spaces(0,6,control_enabled[m] ? "*" : (control_direction[m] ? "<" : ">"),1);
-            write_str_with_spaces(1,6,control_value[c],14);
+            ssd1306_writecharXOR(pos++,7,(val*8)/(ADC_MAX_VALUE/8));
             sample_changed[m] = false;
             display_refresh();
             return;
@@ -437,7 +451,10 @@ static void __no_inline_not_in_flash_func(alarm_func)(uint alarm_num)
         } while (hardware_alarm_set_target(claimed_alarm_num, next_alarm_time));
         return;
     } 
-    next_sample = 0;
+    int32_t s = synth_process_all_units() / MAX_POLYPHONY;
+    if (s < (-QUANTIZATION_MAX)) s = -QUANTIZATION_MAX;
+    if (s > (QUANTIZATION_MAX-1)) s = QUANTIZATION_MAX-1;
+    next_sample = (s + QUANTIZATION_MAX) / ((QUANTIZATION_MAX*2) / DAC_PWM_WRAP_VALUE);
     ticktock = 1;
     last_time = delayed_by_us(last_time, 30);
     do
@@ -798,7 +815,7 @@ void adjust_synth_params(void)
 #define FLASH_PAGE_BYTES 4096u
 #define FLASH_OFFSET_STORED (2*1024*1024)
 #define FLASH_BASE_ADR 0x10000000
-#define FLASH_MAGIC_NUMBER 0xFEE1FED3
+#define FLASH_MAGIC_NUMBER 0xFEE1FED4
 
 #define FLASH_PAGES(x) ((((x)+(FLASH_PAGE_BYTES-1))/FLASH_PAGE_BYTES)*FLASH_PAGE_BYTES)
 
@@ -812,6 +829,7 @@ typedef struct _flash_layout_data
     uint32_t magic_number;
     uint32_t gen_no;
     uint8_t  desc[16];
+    project_configuration pc;
     uint16_t samples[NUMBER_OF_CONTROLS];
     dsp_parm dsp_parms[MAX_DSP_UNITS];
     synth_parm synth_parms[MAX_SYNTH_UNITS];
@@ -953,9 +971,11 @@ int flash_load_bank(uint bankno)
         if (fl->fld.gen_no > last_gen_no)
             last_gen_no = fl->fld.gen_no;
         memcpy(desc, fl->fld.desc, sizeof(desc));
+        memcpy((void *)&pc, (void *) &fl->fld.pc, sizeof(pc));
         memcpy((void *)samples, (void *) &fl->fld.samples, sizeof(samples));
         memcpy((void *)dsp_parms, (void *) &fl->fld.dsp_parms, sizeof(dsp_parms));
         memcpy((void *)synth_parms, (void *) &fl->fld.synth_parms, sizeof(synth_parms));
+        initialize_project_configuration();
         dsp_unit_reset_all();
         synth_unit_reset_all();
     } else return -1;
@@ -1064,6 +1084,7 @@ int flash_save_bank(uint bankno)
     fl->fld.gen_no = (++last_gen_no);
     memcpy(fl->fld.desc, desc, sizeof(fl->fld.desc));
     memcpy(fl->fld.samples, samples, sizeof(fl->fld.samples));
+    memcpy((void *)&fl->fld.pc, (void *)&pc, sizeof(fl->fld.pc));
     memcpy((void *)&fl->fld.dsp_parms, (void *)dsp_parms, sizeof(fl->fld.dsp_parms));
     memcpy((void *)&fl->fld.synth_parms, (void *)synth_parms, sizeof(fl->fld.synth_parms));
     int ret = write_data_to_flash(flash_offset_bank(bankno), (uint8_t *) fl, 1, sizeof(flash_layout));
@@ -1108,20 +1129,23 @@ void debugstuff(void)
             }
         }
         ssd1306_Clear_Buffer();
+        sprintf(str,"%d",next_sample);
+        ssd1306_set_cursor(0,2);
+        ssd1306_printstring(str);
         sprintf(str,"%u %c%c%c%c%c",counter,buttonpressed(0),buttonpressed(1),buttonpressed(2),buttonpressed(3),buttonpressed(4));
         ssd1306_set_cursor(0,3);
         ssd1306_printstring(str);
         sprintf(str,"buf: %d",sample_circ_buf_value(0));
         ssd1306_set_cursor(0,4);
         ssd1306_printstring(str);
-         sprintf(str,"rate %u",(uint32_t)((((uint64_t)counter)*1000000)/time_us_32()));
+        sprintf(str,"rate %u",(uint32_t)((((uint64_t)counter)*1000000)/time_us_32()));
         ssd1306_set_cursor(0,5);
         ssd1306_printstring(str);
         ssd1306_render();
     }
 }
 
-const char * const mainmenu[] = { "SynthAdj", "FiltAdjust", "Debug", "Pedal", "Load", "Save", NULL };
+const char * const mainmenu[] = { "SynthAdj", "FiltAdjust", "Debug", "Pedal", "Load", "Save", "Conf", NULL };
 
 menu_str mainmenu_str = { mainmenu, 0, 2, 15, 0, 0 };
 
@@ -1552,12 +1576,98 @@ void test_controls(void)
    }
 }
 
+const char *const confmenu[] = {"Quit", "Transpose", "FailDelay", NULL };
+
+typedef struct _configuration_entry
+{
+  void     *entry;
+  uint8_t   bytes;
+  uint8_t   digits;
+  uint32_t  min_value;
+  uint32_t  max_value;
+} configuration_entry;
+
+const configuration_entry configuration_entries[] = 
+{
+  { &pc.note_transpose,             1, 2, 0, 95 },    /* NOTE TRANSPOSE */
+  { &pc.fail_delay,                 4, 5, 1, 99999 }  /* FAIL DELAY */
+};
+
+void configuration(void)
+{
+  clear_display();
+  uint8_t selected;
+
+  write_str(0,2,"Configuration");
+  menu_str mn = { confmenu, 0, 3, 16, 0, 0 };
+  do_show_menu_item(&mn);
+  for (;;)
+  {
+    const configuration_entry *c = NULL;
+    scroll_number_dat snd = { 0, 4, 0, 0, 0, 0, 0, 0, 0, 0 };
+    int last_item = -1;
+    do
+    {
+      idle_task();
+      selected = do_menu(&mn);
+      if (mn.item != last_item)
+      {
+          last_item = mn.item;
+          if (mn.item == 0)
+          {
+             c = NULL;
+             write_str_with_spaces(0, 4, "", 16);
+          } else
+          {
+             char s[20];
+             c = &configuration_entries[mn.item-1];
+             switch (c->bytes)
+             {
+                case 1: snd.n = *((uint8_t *)c->entry);
+                        break;
+                case 2: snd.n = *((uint16_t *)c->entry);
+                        break;
+                case 4: snd.n = *((uint32_t *)c->entry);
+                        break;
+             } 
+             char *d = number_str(s, snd.n, c->digits, 0);
+             write_str_with_spaces(0, 4, d, 16);
+          }
+          display_refresh();
+      }
+    } while (!selected);
+    if (mn.item == 0)  break;
+    snd.digits = c->digits;
+    snd.minimum_number = c->min_value;
+    snd.maximum_number = c->max_value;
+    scroll_number_start(&snd);
+    while (!snd.entered)
+    {
+      idle_task();
+      scroll_number_key(&snd);
+    }
+    if (snd.changed)
+    {
+      switch (c->bytes)
+      {
+        case 1: *((uint8_t *)c->entry) = snd.n;
+                break;
+        case 2: *((uint16_t *)c->entry) = snd.n;
+                break;
+        case 4: *((uint32_t *)c->entry) = snd.n;
+                break;
+      }
+    } 
+  }
+}
+
 int main()
 {
     sleep_us(250000u);
     set_sys_clock_khz(250000u, true);
     initialize_uart();
     usb_init();    
+    initialize_project_configuration();
     initialize_dsp();
     synth_initialize();
     initialize_gpio();
@@ -1603,6 +1713,8 @@ int main()
             case 4:  flash_load();
                      break;
             case 5:  flash_save();
+                     break;
+            case 6:  configuration();
                      break;
         }
     }

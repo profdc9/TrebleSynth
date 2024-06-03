@@ -35,6 +35,15 @@
 #define QUANTIZATION_MAX (1<<QUANTIZATION_BITS)
 #define QUANTIZATION_MAX_FLOAT ((float)(1<<QUANTIZATION_BITS))
 
+uint32_t synth_note_frequency_table_counter[MIDI_NOTES];
+float synth_note_frequency_table[MIDI_NOTES];
+
+bool synth_note_active[MAX_POLYPHONY];
+bool synth_note_stopping[MAX_POLYPHONY];
+uint8_t synth_note_number[MAX_POLYPHONY];
+uint8_t synth_note_velocity[MAX_POLYPHONY];
+uint32_t synth_note_stopping_counter[MAX_POLYPHONY];
+
 synth_unit synth_units[MAX_POLYPHONY][MAX_SYNTH_UNITS];
 synth_parm synth_parms[MAX_SYNTH_UNITS];
 int32_t synth_unit_result[MAX_POLYPHONY][MAX_SYNTH_UNITS+1];
@@ -42,11 +51,39 @@ int32_t synth_unit_result[MAX_POLYPHONY][MAX_SYNTH_UNITS+1];
 mutex_t synth_mutex;
 mutex_t note_mutexes[MAX_POLYPHONY];
 
+inline float frequency_fraction_from_vco(uint32_t vco)
+{
+    return expf((SEMITONE_LOG_STEP*((float)MIDI_NOTES)/((float)QUANTIZATION_MAX))*((float)vco))*(MIDI_FREQUENCY_0/((float)DSP_SAMPLERATE));
+}
+
+inline float frequency_semitone_fraction_from_vco(uint32_t vco)
+{
+    return expf((SEMITONE_LOG_STEP*((float)MIDI_NOTES)/((float)QUANTIZATION_MAX))*((float)vco))*(SEMITONE_LOG_STEP*MIDI_FREQUENCY_0/((float)DSP_SAMPLERATE));
+}
+
+inline float counter_fraction_from_vco(uint32_t vco)
+{
+    return expf((SEMITONE_LOG_STEP*((float)MIDI_NOTES)/((float)QUANTIZATION_MAX))*((float)vco))*((MIDI_FREQUENCY_0/((float)DSP_SAMPLERATE))*((((float)SYNTH_OSCILLATOR_PRECISION)*SINE_TABLE_ENTRIES)));
+}
+
+void synth_note_frequency_table_initialize(void)
+{
+    for (int note_no=0;note_no<MIDI_NOTES;note_no++)
+    {
+        synth_note_frequency_table[note_no] = expf(SEMITONE_LOG_STEP*note_no)*(MIDI_FREQUENCY_0/DSP_SAMPLERATE);
+        synth_note_frequency_table_counter[note_no] =  synth_note_frequency_table[note_no]*(((float)SYNTH_OSCILLATOR_PRECISION)*SINE_TABLE_ENTRIES);
+    }
+}
+
 /**************************** SYNTH_TYPE_NONE **************************************************/
 
-int32_t synth_type_process_none(int32_t sample, int32_t control, synth_parm *dp, synth_unit *du)
+int32_t synth_type_process_none(int32_t sample, int32_t control, synth_parm *sp, synth_unit *su)
 {
     return sample;
+}
+
+void synth_note_start_none(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t velocity)
+{
 }
 
 const synth_parm_configuration_entry synth_parm_configuration_entry_none[] = 
@@ -56,6 +93,33 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_none[] =
 };
 
 const synth_parm_none synth_parm_none_default = { 0, 0, 0 };
+
+/**************************** SYNTH_TYPE_VCO **************************************************/
+
+
+int32_t synth_type_process_vco(int32_t sample, int32_t control, synth_parm *sp, synth_unit *su)
+{
+    su->stvco.counter += su->stvco.counter_inc;
+    uint32_t ent = su->stvco.counter / SYNTH_OSCILLATOR_PRECISION;
+    sample = sine_table_entry(ent);
+    return sample;
+}
+
+void synth_note_start_vco(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t velocity)
+{
+    float counter_inc_float = counter_fraction_from_vco(vco);
+    su->stvco.counter_inc = counter_inc_float;
+    su->stvco.counter_semitone = counter_inc_float * SEMITONE_LOG_STEP;
+}
+
+const synth_parm_configuration_entry synth_parm_configuration_entry_vco[] = 
+{
+    { "SourceUnit",  offsetof(synth_parm_vco,source_unit),        4, 2, 1, MAX_SYNTH_UNITS, NULL },
+    { "ControlUnit", offsetof(synth_parm_vco,control_unit),       4, 2, 1, MAX_SYNTH_UNITS, NULL },
+    { NULL, 0, 4, 0, 0,   1, NULL    }
+};
+
+const synth_parm_none synth_parm_vco_default = { 0, 0, 0 };
 
 /******************************SYNTH_TYPE_SINE_SYNTH*******************************************/
 
@@ -108,6 +172,9 @@ int32_t synth_type_process_sin_synth(int32_t sample, int32_t control, synth_parm
     return sine_val;
 }
 
+void synth_note_start_sin_synth(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t velocity)
+{
+}
 
 const synth_parm_configuration_entry synth_parm_configuration_entry_sin_synth[] = 
 {
@@ -131,6 +198,7 @@ const synth_parm_sine_synth synth_parm_sine_synth_default = { 0, 0, 0, 255, { 30
 const char * const stnames[] = 
 {
     "None",
+    "VCO",
     "Sin Synth",
     NULL
 };
@@ -138,18 +206,28 @@ const char * const stnames[] =
 const synth_parm_configuration_entry * const spce[] = 
 {
     synth_parm_configuration_entry_none,
+    synth_parm_configuration_entry_vco,
     synth_parm_configuration_entry_sin_synth, 
     NULL
 };
 
 synth_type_process * const stp[] = {
     synth_type_process_none,
+    synth_type_process_vco,
     synth_type_process_sin_synth,
+};
+
+synth_note_start * const sns[] = 
+{
+    synth_note_start_none,
+    synth_note_start_vco,
+    synth_note_start_sin_synth
 };
 
 const void * const synth_parm_struct_defaults[] =
 {
     (void *) &synth_parm_none_default,
+    (void *) &synth_parm_vco_default,
     (void *) &synth_parm_sine_synth_default
 };
 
@@ -242,11 +320,63 @@ static inline int32_t synth_process(int32_t sample, int32_t control, synth_parm 
     return stp[(int)sp->stn.sut](sample, control, sp, su);
 }
 
+void synth_start_note(uint8_t note_no, uint8_t velocity)
+{
+    for (int note=0;note<MAX_POLYPHONY;note++)
+        if ((synth_note_active[note]) && (synth_note_number[note] == note_no)) return;
+    for (int note=0;note<MAX_POLYPHONY;note++)
+    {
+        if (!synth_note_active[note])
+        {
+            mutex_enter_blocking(&note_mutexes[note]);
+            for (int unit_no=0;unit_no<MAX_SYNTH_UNITS;unit_no++)
+            {
+                synth_unit *su = synth_unit_entry(note, unit_no);
+                synth_parm *sp = synth_parm_entry(unit_no);
+                memset(su,'\000',sizeof(synth_unit));
+                sns[(int)sp->stn.sut](sp, su, ((uint32_t)note_no)*(QUANTIZATION_MAX/MIDI_NOTES), velocity);
+            }
+            synth_note_number[note] = note_no;
+            synth_note_velocity[note] = velocity;
+            synth_note_stopping[note] = false;
+            synth_note_stopping_counter[note] = 0;
+            DMB();
+            synth_note_active[note] = true;
+            DMB();
+            mutex_exit(&note_mutexes[note]);
+            return;
+        }
+    }
+}
+
+void synth_stop_note(uint8_t note_no, uint8_t velocity)
+{
+    for (int note=0;note<MAX_POLYPHONY;note++)
+        if ((synth_note_active[note]) && (synth_note_number[note] == note_no))
+        {
+            mutex_enter_blocking(&note_mutexes[note]);
+            synth_note_stopping_counter[note] = pc.fail_delay;
+            DMB();
+            synth_note_stopping[note] = true;
+            DMB();
+            mutex_exit(&note_mutexes[note]);
+            return;
+        }
+}
+
 void synth_initialize(void)
 {
+    synth_note_frequency_table_initialize();
     mutex_init(&synth_mutex);
     for (int i=0;i<MAX_POLYPHONY;i++)
+    {
+        synth_note_active[i] = false;
+        synth_note_stopping[i] = false;
+        synth_note_stopping_counter[i] = 0;
+        synth_note_number[i] = 0;
+        synth_note_velocity[i] = 0;
         mutex_init(&note_mutexes[i]);
+    }
     for (int unit_number=0;unit_number<MAX_SYNTH_UNITS;unit_number++) 
         synth_unit_initialize(unit_number, SYNTH_TYPE_NONE);
 }
@@ -256,7 +386,7 @@ int32_t synth_process_all_units(void)
     int32_t total_sample = 0;
     for (int note=0;note<MAX_POLYPHONY;note++)
     {
-        if (mutex_try_enter(&note_mutexes[note],NULL))
+        if ((synth_note_active[note]) && (mutex_try_enter(&note_mutexes[note],NULL)))
         {
             synth_unit_result[note][0] = 0;
             for (int unit_no=0;unit_no<MAX_SYNTH_UNITS;unit_no++)
@@ -267,6 +397,13 @@ int32_t synth_process_all_units(void)
                 synth_unit_result[note][unit_no+1] = synth_process(prev, prev, sp, su);
             }
             total_sample += synth_unit_result[note][MAX_SYNTH_UNITS];
+            if (synth_note_stopping[note])
+            {
+                if (synth_note_stopping_counter[note] > 0)
+                    synth_note_stopping_counter[note]--;
+                else
+                    synth_note_active[note] = false;
+            }
             mutex_exit(&note_mutexes[note]);
         }
     }

@@ -265,6 +265,18 @@ static void WriteChar(uint8_t *buf, int16_t x, int16_t y, uint8_t ch) {
     }
 }
 
+static void WriteCharXOR(uint8_t *buf, int16_t x, int16_t y, uint8_t ch) {
+    if (x > (SSD1306_WIDTH/8 - 1) || y > (SSD1306_HEIGHT/8 - 1))
+        return;
+
+    int idx = GetFontIndex(ch) * 8;
+    int fb_idx = y * 128 + x * 8;
+
+    for (int i=0;i<8;i++) {
+        buf[fb_idx++] ^= font68[idx + i];
+    }
+}
+
 static void WriteCharAtCursor(uint8_t *buf, uint8_t ch)
 {
     ssd1306_remove_cursor();
@@ -333,6 +345,13 @@ void ssd1306_printchar(uint8_t ch)
     WriteCharAtCursor(ssd1306_buf, ch);
     ssd1306_modified = 1;
 }
+
+void ssd1306_writecharXOR(int16_t x, int16_t y, uint8_t ch)
+{
+    WriteCharXOR(ssd1306_buf, x, y, ch);
+    ssd1306_modified = 1;
+}
+
 
 void ssd1306_printstring(const char *str)
 {

@@ -85,6 +85,16 @@ extern "C"
 uint16_t read_potentiometer_value(uint v);
 
 #define POTENTIOMETER_VALUE_SENSITIVITY 20
+#define PROJECT_MAGIC_NUMBER 0xF00BB00F
+
+typedef struct _project_configuration
+{ 
+  uint32_t  magic_number;
+  uint8_t   note_transpose;
+  uint32_t  fail_delay;
+} project_configuration;
+
+extern project_configuration pc;
 
 #ifdef __cplusplus
 }

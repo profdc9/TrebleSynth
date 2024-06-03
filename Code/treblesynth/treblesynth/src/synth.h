@@ -32,9 +32,13 @@ extern "C"
 
 #include "dsp.h"
 
+#define SEMITONE_LOG_STEP 0.0577622650467f
+#define MIDI_FREQUENCY_0 8.17579891564f
+#define MIDI_NOTES 128
+
 #define MAX_POLYPHONY 8
 #define MAX_SYNTH_UNITS 16
-
+#define SYNTH_OSCILLATOR_PRECISION 65536
 
 typedef enum 
 {
@@ -54,6 +58,22 @@ typedef struct
 {
     uint32_t notused;
 } synth_type_none;
+
+typedef struct
+{
+    synth_unit_type sut;
+    uint32_t source_unit;
+    uint32_t control_unit;
+    uint32_t osc_type;
+    uint32_t control_gain;
+} synth_parm_vco;
+
+typedef struct
+{
+    uint32_t counter;
+    uint32_t counter_inc;
+    int32_t  counter_semitone;
+} synth_type_vco;    
 
 typedef struct
 {
@@ -79,17 +99,19 @@ typedef struct
 typedef union 
 {
     synth_type_none         stn;
+    synth_type_vco          stvco;
     synth_type_sine_synth   stss;
 } synth_unit;
 
 typedef union 
 {
     synth_parm_none         stn;
+    synth_parm_vco          stvco;
     synth_parm_sine_synth   stss;
 } synth_parm;
 
-typedef bool    (synth_type_initialize)(void *initialization_data, synth_unit *su);
 typedef int32_t (synth_type_process)(int32_t sample, int32_t control, synth_parm *sp, synth_unit *su);
+typedef void (synth_note_start)(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t velocity);
 
 int32_t synth_process_all_units(void);
 void synth_unit_struct_zero(synth_unit *su);
@@ -134,6 +156,9 @@ void synth_set_value_prec(void *v, int prec, uint32_t val);
 void synth_unit_reset_unitno(int synth_unit_number);
 void synth_unit_reset_all(void);
 void synth_initialize(void);
+
+void synth_start_note(uint8_t note_no, uint8_t velocity);
+void synth_stop_note(uint8_t note_no, uint8_t velocity);
 
 #ifdef __cplusplus
 }

@@ -88,6 +88,8 @@ void ssd1306_printchar(uint8_t ch);
 void ssd1306_printstring(const char *str);
 void ssd1306_update(void);
 
+void ssd1306_writecharXOR(int16_t x, int16_t y, uint8_t ch);
+
 #ifdef __cplusplus
 }
 #endif
