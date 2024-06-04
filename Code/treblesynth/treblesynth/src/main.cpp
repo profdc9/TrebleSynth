@@ -81,7 +81,7 @@ const project_configuration pc_default =
 {
   PROJECT_MAGIC_NUMBER,  /* magic_number */
   48,                    /* transpose value */
-  5000,                  /* fail delay */
+  15000,                 /* fail delay */
 };
 
 void initialize_project_configuration(void)
@@ -451,7 +451,7 @@ static void __no_inline_not_in_flash_func(alarm_func)(uint alarm_num)
         } while (hardware_alarm_set_target(claimed_alarm_num, next_alarm_time));
         return;
     } 
-    int32_t s = synth_process_all_units() / MAX_POLYPHONY;
+    int32_t s = synth_process_all_units() / (MAX_POLYPHONY/2);
     if (s < (-QUANTIZATION_MAX)) s = -QUANTIZATION_MAX;
     if (s > (QUANTIZATION_MAX-1)) s = QUANTIZATION_MAX-1;
     next_sample = (s + QUANTIZATION_MAX) / ((QUANTIZATION_MAX*2) / DAC_PWM_WRAP_VALUE);
@@ -1111,6 +1111,13 @@ void flash_save(void)
     message_to_display(flash_save_bank(bankno-1) ? "Save Failed" : "Save Succeeded");      
 }
 
+static int32_t dv1=0, dv2=0, dv3=0;
+
+void set_debug_vals(int32_t v1, int32_t v2, int32_t v3)
+{
+    dv1=v1;dv2=v2;dv3=v3;
+}
+
 void debugstuff(void)
 {
     char str[40];
@@ -1129,7 +1136,13 @@ void debugstuff(void)
             }
         }
         ssd1306_Clear_Buffer();
-        sprintf(str,"%d",next_sample);
+        sprintf(str,"v1=%d",dv1);
+        ssd1306_set_cursor(0,0);
+        ssd1306_printstring(str);
+        sprintf(str,"v2=%d",dv2);
+        ssd1306_set_cursor(0,1);
+        ssd1306_printstring(str);
+        sprintf(str,"v3=%d",dv3);
         ssd1306_set_cursor(0,2);
         ssd1306_printstring(str);
         sprintf(str,"%u %c%c%c%c%c",counter,buttonpressed(0),buttonpressed(1),buttonpressed(2),buttonpressed(3),buttonpressed(4));

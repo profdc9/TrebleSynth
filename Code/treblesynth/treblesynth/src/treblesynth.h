@@ -54,7 +54,7 @@
 #define DAC_PWM_B1 13
 #define DAC_PWM_B0 12
 
-#define DAC_PWM_WRAP_VALUE 0x400
+#define DAC_PWM_WRAP_VALUE 0x1000
 
 #define ADC_A1 26
 #define ADC_A2 27
@@ -83,6 +83,8 @@ extern "C"
 #endif
 
 uint16_t read_potentiometer_value(uint v);
+
+void set_debug_vals(int32_t v1, int32_t v2, int32_t v3);
 
 #define POTENTIOMETER_VALUE_SENSITIVITY 20
 #define PROJECT_MAGIC_NUMBER 0xF00BB00F

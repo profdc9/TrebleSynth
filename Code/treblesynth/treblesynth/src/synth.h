@@ -38,11 +38,13 @@ extern "C"
 
 #define MAX_POLYPHONY 8
 #define MAX_SYNTH_UNITS 16
-#define SYNTH_OSCILLATOR_PRECISION 65536
+#define SYNTH_OSCILLATOR_PRECISION 256
 
 typedef enum 
 {
     SYNTH_TYPE_NONE = 0,
+    SYNTH_TYPE_VCO, 
+    SYNTH_TYPE_ADSR,
     SYNTH_TYPE_SINE_SYNTH,
     SYNTH_TYPE_MAX_ENTRY
 } synth_unit_type;
@@ -77,6 +79,37 @@ typedef struct
 
 typedef struct
 {
+    synth_unit_type sut;
+    uint32_t source_unit;
+    uint32_t control_unit;
+    uint32_t attack;
+    uint32_t decay;
+    uint32_t sustain_level;
+    uint32_t release;
+
+    uint32_t control_attack;
+    uint32_t control_sustain;
+    uint32_t control_decay;
+    uint32_t control_release;
+} synth_parm_adsr;
+
+typedef struct
+{
+    uint32_t phase;
+    uint32_t counter;
+    uint32_t max_amp_level;
+    uint32_t sustain_amp_level;
+    uint32_t rise_slope;
+    uint32_t decay_slope;
+    uint32_t release_slope;
+    
+    uint32_t attack_time;
+    uint32_t decay_time;
+    uint32_t release_time;
+} synth_type_adsr;    
+
+typedef struct
+{
     synth_unit_type  sut;
     uint32_t source_unit;
     uint32_t control_unit;
@@ -100,6 +133,7 @@ typedef union
 {
     synth_type_none         stn;
     synth_type_vco          stvco;
+    synth_type_adsr         stadsr;
     synth_type_sine_synth   stss;
 } synth_unit;
 
@@ -107,10 +141,11 @@ typedef union
 {
     synth_parm_none         stn;
     synth_parm_vco          stvco;
+    synth_parm_adsr         stadsr;
     synth_parm_sine_synth   stss;
 } synth_parm;
 
-typedef int32_t (synth_type_process)(int32_t sample, int32_t control, synth_parm *sp, synth_unit *su);
+typedef int32_t (synth_type_process)(int32_t sample, int32_t control, synth_parm *sp, synth_unit *su, int note);
 typedef void (synth_note_start)(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t velocity);
 
 int32_t synth_process_all_units(void);
