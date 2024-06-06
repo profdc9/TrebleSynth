@@ -45,6 +45,8 @@ typedef enum
     SYNTH_TYPE_NONE = 0,
     SYNTH_TYPE_VCO, 
     SYNTH_TYPE_ADSR,
+    SYNTH_TYPE_LOWPASS,
+    SYNTH_TYPE_OSC,
     SYNTH_TYPE_SINE_SYNTH,
     SYNTH_TYPE_MAX_ENTRY
 } synth_unit_type;
@@ -68,13 +70,14 @@ typedef struct
     uint32_t control_unit;
     uint32_t osc_type;
     uint32_t control_gain;
+    uint32_t amplitude;
 } synth_parm_vco;
 
 typedef struct
 {
     uint32_t counter;
     uint32_t counter_inc;
-    int32_t  counter_semitone;
+    int32_t  counter_semitone_control_gain;
 } synth_type_vco;    
 
 typedef struct
@@ -102,11 +105,43 @@ typedef struct
     uint32_t rise_slope;
     uint32_t decay_slope;
     uint32_t release_slope;
-    
-    uint32_t attack_time;
-    uint32_t decay_time;
-    uint32_t release_time;
 } synth_type_adsr;    
+
+typedef struct
+{
+    synth_unit_type sut;
+    uint32_t source_unit;
+    uint32_t control_unit;
+    uint32_t kneefreq;
+    uint32_t stages;
+} synth_parm_lowpass;
+
+typedef struct
+{
+    int32_t   alpha;
+    int32_t   stage_y[6];
+} synth_type_lowpass;
+
+typedef struct
+{
+    synth_unit_type sut;
+    uint32_t source_unit;
+    uint32_t control_unit;
+    uint32_t osc_type;
+    uint32_t control_gain;
+    uint32_t frequency;
+    uint32_t amplitude;
+    uint32_t control_bend;
+    uint32_t bend_gain;
+} synth_parm_osc;
+
+typedef struct
+{
+    uint32_t counter;
+    uint32_t counter_inc;
+    int32_t  counter_semitone_control_gain;
+    int32_t  counter_semitone_bend_gain;
+} synth_type_osc;    
 
 typedef struct
 {
@@ -134,6 +169,8 @@ typedef union
     synth_type_none         stn;
     synth_type_vco          stvco;
     synth_type_adsr         stadsr;
+    synth_type_lowpass      stlp;
+    synth_type_osc          stosc;
     synth_type_sine_synth   stss;
 } synth_unit;
 
@@ -142,6 +179,8 @@ typedef union
     synth_parm_none         stn;
     synth_parm_vco          stvco;
     synth_parm_adsr         stadsr;
+    synth_parm_lowpass      stlp;
+    synth_parm_osc          stosc;
     synth_parm_sine_synth   stss;
 } synth_parm;
 

@@ -451,7 +451,7 @@ static void __no_inline_not_in_flash_func(alarm_func)(uint alarm_num)
         } while (hardware_alarm_set_target(claimed_alarm_num, next_alarm_time));
         return;
     } 
-    int32_t s = synth_process_all_units() / (MAX_POLYPHONY/2);
+    int32_t s = synth_process_all_units() / (MAX_POLYPHONY/4);
     if (s < (-QUANTIZATION_MAX)) s = -QUANTIZATION_MAX;
     if (s > (QUANTIZATION_MAX-1)) s = QUANTIZATION_MAX-1;
     next_sample = (s + QUANTIZATION_MAX) / ((QUANTIZATION_MAX*2) / DAC_PWM_WRAP_VALUE);
@@ -815,7 +815,7 @@ void adjust_synth_params(void)
 #define FLASH_PAGE_BYTES 4096u
 #define FLASH_OFFSET_STORED (2*1024*1024)
 #define FLASH_BASE_ADR 0x10000000
-#define FLASH_MAGIC_NUMBER 0xFEE1FED4
+#define FLASH_MAGIC_NUMBER 0xFEE1FED8
 
 #define FLASH_PAGES(x) ((((x)+(FLASH_PAGE_BYTES-1))/FLASH_PAGE_BYTES)*FLASH_PAGE_BYTES)
 

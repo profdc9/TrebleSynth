@@ -4,6 +4,7 @@ add_executable(treblesynth
     src/buttons.c
     src/dsp.c
     src/synth.c
+    src/waves.c
     src/ui.c
     src/tinycl.cpp
     src/usbmain.c

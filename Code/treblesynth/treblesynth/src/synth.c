@@ -28,6 +28,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <math.h>
+#include "waves.h"
 #include "synth.h"
 #include "treblesynth.h"
 
@@ -53,6 +54,11 @@ int32_t synth_unit_result[MAX_POLYPHONY][MAX_SYNTH_UNITS+1];
 mutex_t synth_mutex;
 mutex_t note_mutexes[MAX_POLYPHONY];
 
+inline float frequency_omega_from_vco(uint32_t vco)
+{
+    return expf((SEMITONE_LOG_STEP*((float)MIDI_NOTES)/((float)QUANTIZATION_MAX))*((float)vco))*(MATH_PI_F*2.0f*MIDI_FREQUENCY_0/((float)DSP_SAMPLERATE));
+}
+
 inline float frequency_fraction_from_vco(uint32_t vco)
 {
     return expf((SEMITONE_LOG_STEP*((float)MIDI_NOTES)/((float)QUANTIZATION_MAX))*((float)vco))*(MIDI_FREQUENCY_0/((float)DSP_SAMPLERATE));
@@ -65,7 +71,7 @@ inline float frequency_semitone_fraction_from_vco(uint32_t vco)
 
 inline float counter_fraction_from_vco(uint32_t vco)
 {
-    return expf((SEMITONE_LOG_STEP*((float)MIDI_NOTES)/((float)QUANTIZATION_MAX))*((float)vco))*((MIDI_FREQUENCY_0/((float)DSP_SAMPLERATE))*((((float)SYNTH_OSCILLATOR_PRECISION)*SINE_TABLE_ENTRIES)));
+    return expf((SEMITONE_LOG_STEP*((float)MIDI_NOTES)/((float)QUANTIZATION_MAX))*((float)vco))*((MIDI_FREQUENCY_0/((float)DSP_SAMPLERATE))*((((float)SYNTH_OSCILLATOR_PRECISION)*WAVETABLES_LENGTH)));
 }
 
 void synth_note_frequency_table_initialize(void)
@@ -101,32 +107,9 @@ const synth_parm_none synth_parm_none_default = { 0, 0, 0 };
 
 int32_t synth_type_process_vco(int32_t sample, int32_t control, synth_parm *sp, synth_unit *su, int note)
 {
-    su->stvco.counter += (su->stvco.counter_inc + (su->stvco.counter_semitone*(control/64))/(QUANTIZATION_MAX/64) );
-    uint32_t ent = (su->stvco.counter / SYNTH_OSCILLATOR_PRECISION) & (SINE_TABLE_ENTRIES-1);
-    switch (sp->stvco.osc_type)
-    {
-        case 1:  sample = sine_table_entry(ent);   // sine wave
-                 break;
-        case 2:  sample = sine_table_entry(ent/2); // half sine wave
-                 break;
-        case 3:  ent = (ent + SINE_TABLE_ENTRIES/2) & (SINE_TABLE_ENTRIES-1);
-                 sample = (ent * (QUANTIZATION_MAX*2)) / SINE_TABLE_ENTRIES - QUANTIZATION_MAX;   // sawtooth wave
-                 break;
-        case 4:  ent = (ent + SINE_TABLE_ENTRIES/4) & (SINE_TABLE_ENTRIES-1);
-                 if (ent < (SINE_TABLE_ENTRIES/2))           // triangle wave
-                     sample = (ent * (QUANTIZATION_MAX*2)) / (SINE_TABLE_ENTRIES/2)- QUANTIZATION_MAX;
-                 else
-                     sample = (((SINE_TABLE_ENTRIES-1) - ent) * (QUANTIZATION_MAX*2)) / (SINE_TABLE_ENTRIES/2)- QUANTIZATION_MAX;
-                 break;
-        case 5:  sample = ent < (SINE_TABLE_ENTRIES/2) ? QUANTIZATION_MAX-1 : -QUANTIZATION_MAX;  // square wave
-                 break;
-        case 6:  sample = ent < (SINE_TABLE_ENTRIES/4) ? QUANTIZATION_MAX-1 : (-QUANTIZATION_MAX/3);  // square wave 1/4 duty
-                 break;
-        case 7:  sample = ent < (SINE_TABLE_ENTRIES/8) ? QUANTIZATION_MAX-1 : (-QUANTIZATION_MAX/7);  // square wave 1/8 duty
-                 break;
-        case 8:  sample = ent < (SINE_TABLE_ENTRIES/16) ? QUANTIZATION_MAX-1 : (-QUANTIZATION_MAX/15);  // square wave 1/8 duty
-                 break;
-    }
+    su->stvco.counter += (su->stvco.counter_inc + (su->stvco.counter_semitone_control_gain*(control/64))/(QUANTIZATION_MAX/64) );
+    sample = wavetables[sp->stvco.osc_type-1][(su->stvco.counter / SYNTH_OSCILLATOR_PRECISION) & (WAVETABLES_LENGTH-1)];
+    sample = (sample * ((int32_t)sp->stvco.amplitude)) / 256;
     return sample;
 }
 
@@ -134,19 +117,20 @@ void synth_note_start_vco(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t
 {
     float counter_inc_float = counter_fraction_from_vco(vco);
     su->stvco.counter_inc = counter_inc_float;
-    su->stvco.counter_semitone = (counter_inc_float * SEMITONE_LOG_STEP) * sp->stvco.control_gain;
+    su->stvco.counter_semitone_control_gain = (counter_inc_float * SEMITONE_LOG_STEP) * sp->stvco.control_gain;
 }
 
 const synth_parm_configuration_entry synth_parm_configuration_entry_vco[] = 
 {
     { "SourceUnit",  offsetof(synth_parm_vco,source_unit),        4, 2, 1, MAX_SYNTH_UNITS, NULL },
     { "ControlUnit", offsetof(synth_parm_vco,control_unit),       4, 2, 1, MAX_SYNTH_UNITS, NULL },
-    { "OscType",     offsetof(synth_parm_vco,osc_type),           4, 1, 1, 8, NULL },
-    { "ControlGain", offsetof(synth_parm_vco,control_gain),       4, 2, 0, 15, NULL },
+    { "OscType",     offsetof(synth_parm_vco,osc_type),           4, 1, 1, WAVETABLES_NUMBER, NULL },
+    { "ControlGain", offsetof(synth_parm_vco,control_gain),       4, 2, 0, 31, NULL },
+    { "Amplitude",   offsetof(synth_parm_vco,amplitude),          4, 3, 0, 255, NULL },        
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
-const synth_parm_vco synth_parm_vco_default = { 0, 0, 0, 1, 1 };
+const synth_parm_vco synth_parm_vco_default = { 0, 0, 0, 1, 1, 255 };
 
 /**************************** SYNTH_TYPE_ADSR **************************************************/
 
@@ -158,14 +142,14 @@ int32_t synth_type_process_adsr(int32_t sample, int32_t control, synth_parm *sp,
     switch (su->stadsr.phase)
     {
         case 0:  amplitude = (su->stadsr.counter * su->stadsr.rise_slope) / ADSR_SLOPE_SCALING;
-                 if ((++su->stadsr.counter) >= su->stadsr.attack_time)
+                 if ((++su->stadsr.counter) >= sp->stadsr.attack)
                  {
                      su->stadsr.counter = 0;
                      su->stadsr.phase = 1;
                  }
                  break;
         case 1:  amplitude = su->stadsr.max_amp_level - ((su->stadsr.counter * su->stadsr.decay_slope) / ADSR_SLOPE_SCALING);
-                 if ((++su->stadsr.counter) >= su->stadsr.decay_time)
+                 if ((++su->stadsr.counter) >= sp->stadsr.decay)
                  {
                      su->stadsr.counter = 0;
                      su->stadsr.phase = 2;
@@ -179,7 +163,7 @@ int32_t synth_type_process_adsr(int32_t sample, int32_t control, synth_parm *sp,
                  }
                  break;
         case 3:  amplitude = su->stadsr.sustain_amp_level - ((su->stadsr.counter * su->stadsr.release_slope) / ADSR_SLOPE_SCALING);
-                 if ((++su->stadsr.counter) >= su->stadsr.release_time)
+                 if ((++su->stadsr.counter) >= sp->stadsr.release)
                      synth_note_active[note] = false;
                      
     }
@@ -190,15 +174,18 @@ int32_t synth_type_process_adsr(int32_t sample, int32_t control, synth_parm *sp,
 void synth_note_start_adsr(synth_parm *sp, synth_unit *su, uint32_t adsr, uint32_t velocity)
 {
     su->stadsr.max_amp_level = (velocity * QUANTIZATION_MAX) / 128;
-    uint32_t sustain_level = (sp->stadsr.control_sustain != 0) ? read_potentiometer_value(sp->stadsr.control_sustain)/64 : sp->stadsr.sustain_level;
-    su->stadsr.sustain_amp_level = (su->stadsr.max_amp_level * sustain_level) / 256;
-    su->stadsr.attack_time = (sp->stadsr.control_attack != 0) ? read_potentiometer_value(sp->stadsr.control_attack)+1024 : sp->stadsr.attack;
-    su->stadsr.rise_slope = (ADSR_SLOPE_SCALING * su->stadsr.max_amp_level) / su->stadsr.attack_time;
-    set_debug_vals(su->stadsr.attack_time,su->stadsr.rise_slope,read_potentiometer_value(sp->stadsr.control_attack));
-    su->stadsr.decay_time = (sp->stadsr.control_decay != 0) ? read_potentiometer_value(sp->stadsr.control_decay)+1024 : sp->stadsr.decay;
-    su->stadsr.decay_slope = (ADSR_SLOPE_SCALING * (su->stadsr.max_amp_level - su->stadsr.sustain_amp_level)) / su->stadsr.decay_time;
-    su->stadsr.release_time = (sp->stadsr.control_release != 0) ? read_potentiometer_value(sp->stadsr.control_release)+1024 : sp->stadsr.release;
-    su->stadsr.release_slope = (ADSR_SLOPE_SCALING * su->stadsr.sustain_amp_level) / su->stadsr.release_time;
+    if (sp->stadsr.control_sustain != 0)
+        sp->stadsr.sustain_level = read_potentiometer_value(sp->stadsr.control_sustain)/64;
+    su->stadsr.sustain_amp_level = (su->stadsr.max_amp_level * sp->stadsr.sustain_level) / 256;
+    if (sp->stadsr.control_attack != 0)
+        sp->stadsr.attack = read_potentiometer_value(sp->stadsr.control_attack)+1024;
+    su->stadsr.rise_slope = (ADSR_SLOPE_SCALING * su->stadsr.max_amp_level) / sp->stadsr.attack;
+    if (sp->stadsr.control_decay != 0)
+        sp->stadsr.decay = read_potentiometer_value(sp->stadsr.control_decay)+1024;
+    su->stadsr.decay_slope = (ADSR_SLOPE_SCALING * (su->stadsr.max_amp_level - su->stadsr.sustain_amp_level)) / sp->stadsr.decay;
+    if (sp->stadsr.control_release != 0)
+        sp->stadsr.release = read_potentiometer_value(sp->stadsr.control_release)+1024;
+    su->stadsr.release_slope = (ADSR_SLOPE_SCALING * su->stadsr.sustain_amp_level) / sp->stadsr.release;
 }
 
 const synth_parm_configuration_entry synth_parm_configuration_entry_adsr[] = 
@@ -218,6 +205,80 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_adsr[] =
 
 const synth_parm_adsr synth_parm_adsr_default = { 0, 0, 0,  2000, 4000, 128, 2000, 0, 0, 0, 0 };
 
+/**************************** SYNTH_TYPE_LOWPASS **************************************************/
+
+int32_t synth_type_process_lowpass(int32_t sample, int32_t control, synth_parm *sp, synth_unit *su, int note)
+{
+    for (int n=0;n<sp->stlp.stages;n++)
+    {
+        su->stlp.stage_y[n] = sample = ((QUANTIZATION_MAX-su->stlp.alpha)*sample + su->stlp.alpha*su->stlp.stage_y[n]) / QUANTIZATION_MAX;
+        sample = su->stlp.stage_y[n];
+    }
+    return sample;    
+}
+
+void synth_note_start_lowpass(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t velocity)
+{
+    float b = ((float)sp->stlp.kneefreq) * (1.0f/256.0f);
+    float c0 = cosf(frequency_omega_from_vco(vco));
+    float lbw = 1.0f-b*c0;
+    float lb = 1.0f-b;
+    float a = (lbw-sqrtf(lbw*lbw-lb*lb)) / lb;
+    su->stlp.alpha = (int32_t) (a * QUANTIZATION_MAX);  
+    
+    set_debug_vals(su->stlp.alpha, (int32_t)(lbw*1000000.f), (int32_t)(lb*1000000.f));
+
+}
+
+const synth_parm_configuration_entry synth_parm_configuration_entry_lowpass[] = 
+{
+    { "SourceUnit",  offsetof(synth_parm_lowpass,source_unit),        4, 2, 1, MAX_SYNTH_UNITS, NULL },
+    { "ControlUnit", offsetof(synth_parm_lowpass,control_unit),       4, 2, 1, MAX_SYNTH_UNITS, NULL },
+    { "KneeFreq",    offsetof(synth_parm_lowpass,kneefreq),           2, 3, 0, 255, NULL },
+    { "Stages",      offsetof(synth_parm_lowpass,stages),             4, 1, 0, 6, NULL },
+    { NULL, 0, 4, 0, 0,   1, NULL    }
+};
+
+const synth_parm_lowpass synth_parm_lowpass_default = { 0, 0, 0, 128, 4 };
+
+/**************************** SYNTH_TYPE_OSC **************************************************/
+
+int32_t synth_type_process_osc(int32_t sample, int32_t control, synth_parm *sp, synth_unit *su, int note)
+{
+    su->stosc.counter += (su->stosc.counter_inc + (su->stosc.counter_semitone_control_gain*(control/64))/(QUANTIZATION_MAX/64) );
+    if (sp->stosc.control_bend != 0)
+    {
+        int32_t pot_value = read_potentiometer_value(sp->stosc.control_bend)/64;
+        su->stosc.counter += (su->stosc.counter_semitone_bend_gain*pot_value)/(POT_MAX_VALUE/64);
+    }
+    sample = wavetables[sp->stosc.osc_type-1][(su->stosc.counter / SYNTH_OSCILLATOR_PRECISION) & (WAVETABLES_LENGTH-1)];
+    sample = (sample * ((int32_t)sp->stosc.amplitude)) / 256;
+    return sample;
+}
+
+void synth_note_start_osc(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t velocity)
+{
+    float counter_inc_float = ((float)sp->stosc.frequency)*((((float)SYNTH_OSCILLATOR_PRECISION)*((float)WAVETABLES_LENGTH))/((float)DSP_SAMPLERATE));
+    su->stvco.counter_inc = counter_inc_float;
+    float f = (counter_inc_float * SEMITONE_LOG_STEP);
+    su->stosc.counter_semitone_control_gain = f * sp->stosc.control_gain;
+    su->stosc.counter_semitone_bend_gain = f * sp->stosc.bend_gain;
+}
+
+const synth_parm_configuration_entry synth_parm_configuration_entry_osc[] = 
+{
+    { "SourceUnit",  offsetof(synth_parm_osc,source_unit),        4, 2, 1, MAX_SYNTH_UNITS, NULL },
+    { "ControlUnit", offsetof(synth_parm_osc,control_unit),       4, 2, 1, MAX_SYNTH_UNITS, NULL },
+    { "Frequency",   offsetof(synth_parm_osc,frequency),          4, 4, 1, 4000, NULL },
+    { "Amplitude",   offsetof(synth_parm_osc,amplitude),          4, 3, 0, 255,  NULL },
+    { "OscType",     offsetof(synth_parm_osc,osc_type),           4, 1, 1, 8, NULL },
+    { "ControlGain", offsetof(synth_parm_osc,control_gain),       4, 2, 0, 15, NULL },
+    { "BendCtrl",    offsetof(synth_parm_osc,control_bend),       4, 2, 0, POTENTIOMETER_MAX, "BendCtrl" },
+    { "BendGain",    offsetof(synth_parm_osc,bend_gain),          4, 2, 0, 15, NULL },
+    { NULL, 0, 4, 0, 0,   1, NULL    }
+};
+
+const synth_parm_osc synth_parm_osc_default = { 0, 0, 0, 1, 1, 262, 255, 0, 1 };
 
 /******************************SYNTH_TYPE_SINE_SYNTH*******************************************/
 
@@ -298,6 +359,8 @@ const char * const stnames[] =
     "None",
     "VCO",
     "ADSR",
+    "Lowpass",
+    "Osc",
     "Sin Synth",
     NULL
 };
@@ -307,6 +370,8 @@ const synth_parm_configuration_entry * const spce[] =
     synth_parm_configuration_entry_none,
     synth_parm_configuration_entry_vco,
     synth_parm_configuration_entry_adsr,
+    synth_parm_configuration_entry_lowpass,
+    synth_parm_configuration_entry_osc,
     synth_parm_configuration_entry_sin_synth, 
     NULL
 };
@@ -315,6 +380,8 @@ synth_type_process * const stp[] = {
     synth_type_process_none,
     synth_type_process_vco,
     synth_type_process_adsr,
+    synth_type_process_lowpass,
+    synth_type_process_osc,
     synth_type_process_sin_synth,
 };
 
@@ -323,6 +390,8 @@ synth_note_start * const sns[] =
     synth_note_start_none,
     synth_note_start_vco,
     synth_note_start_adsr,
+    synth_note_start_lowpass,
+    synth_note_start_osc,
     synth_note_start_sin_synth
 };
 
@@ -331,6 +400,8 @@ const void * const synth_parm_struct_defaults[] =
     (void *) &synth_parm_none_default,
     (void *) &synth_parm_vco_default,
     (void *) &synth_parm_adsr_default,
+    (void *) &synth_parm_lowpass_default,
+    (void *) &synth_parm_osc_default,
     (void *) &synth_parm_sine_synth_default
 };
 
@@ -426,12 +497,13 @@ static inline int32_t synth_process(int32_t sample, int32_t control, synth_parm 
 
 void synth_start_note(uint8_t note_no, uint8_t velocity)
 {
+    uint32_t vco = ((uint32_t)note_no)*(QUANTIZATION_MAX/MIDI_NOTES);
     for (int note=0;note<MAX_POLYPHONY;note++)
     {
         if ((synth_note_active[note]) && (synth_note_number[note] == note_no))
         {
             mutex_enter_blocking(&note_mutexes[note]);
-            synth_note_stopping_counter[note] = 64;
+            synth_note_stopping_counter[note] = 512;
             DMB();
             synth_note_stopping_fast[note] = true;
             DMB();
@@ -449,7 +521,7 @@ void synth_start_note(uint8_t note_no, uint8_t velocity)
                 synth_unit *su = synth_unit_entry(note, unit_no);
                 synth_parm *sp = synth_parm_entry(unit_no);
                 memset(su,'\000',sizeof(synth_unit));
-                sns[(int)sp->stn.sut](sp, su, ((uint32_t)note_no)*(QUANTIZATION_MAX/MIDI_NOTES), velocity);
+                sns[(int)sp->stn.sut](sp, su, vco, velocity);
             }
             synth_note_number[note] = note_no;
             synth_note_velocity[note] = velocity;
@@ -521,7 +593,7 @@ int32_t synth_process_all_units(void)
                if (synth_note_stopping_counter[note] > 0)
                {
                    synth_note_stopping_counter[note]--;
-                   synth_note_last_sample[note] = (synth_note_last_sample[note]*63)/64;
+                   synth_note_last_sample[note] = (synth_note_last_sample[note]*127)/128;
                    total_sample += synth_note_last_sample[note];                   
                } else
                    synth_note_active[note] = false;
