@@ -39,6 +39,7 @@ extern "C"
 #define MAX_POLYPHONY 8
 #define MAX_SYNTH_UNITS 16
 #define SYNTH_OSCILLATOR_PRECISION 256
+#define SYNTH_STOPPING_COUNTER 256
 
 typedef enum 
 {
@@ -47,7 +48,9 @@ typedef enum
     SYNTH_TYPE_ADSR,
     SYNTH_TYPE_LOWPASS,
     SYNTH_TYPE_OSC,
-    SYNTH_TYPE_SINE_SYNTH,
+    SYNTH_TYPE_VCA,
+    SYNTH_TYPE_MIXER,
+    SYNTH_TYPE_RING,
     SYNTH_TYPE_MAX_ENTRY
 } synth_unit_type;
 
@@ -71,6 +74,7 @@ typedef struct
     uint32_t osc_type;
     uint32_t control_gain;
     uint32_t amplitude;
+    uint32_t octave;
 } synth_parm_vco;
 
 typedef struct
@@ -114,6 +118,7 @@ typedef struct
     uint32_t control_unit;
     uint32_t kneefreq;
     uint32_t stages;
+    uint32_t feedback;
 } synth_parm_lowpass;
 
 typedef struct
@@ -145,24 +150,42 @@ typedef struct
 
 typedef struct
 {
-    synth_unit_type  sut;
+    synth_unit_type sut;
     uint32_t source_unit;
     uint32_t control_unit;
-    uint32_t mixval;
-    uint32_t frequency[3];
-    uint32_t amplitude[3];
-    uint32_t control_number1;
-    uint32_t control_number2;
-} synth_parm_sine_synth;
+    uint32_t control_gain;
+    uint32_t amplitude;
+} synth_parm_vca;
 
 typedef struct
 {
-    uint32_t last_frequency[3];
-    uint32_t sine_counter[3];
-    uint32_t sine_counter_inc[3];
-    uint32_t pot_value1;
-    uint32_t pot_value2;
-} synth_type_sine_synth;
+} synth_type_vca;    
+
+typedef struct
+{
+    synth_unit_type sut;
+    uint32_t source_unit;
+    uint32_t control_unit;
+    uint32_t source2_unit;
+    uint32_t mixval;
+    uint32_t amplitude;
+} synth_parm_mixer;
+
+typedef struct
+{
+} synth_type_mixer;
+
+typedef struct
+{
+    synth_unit_type sut;
+    uint32_t source_unit;
+    uint32_t control_unit;
+    uint32_t amplitude;
+} synth_parm_ring;
+
+typedef struct
+{
+} synth_type_ring;    
 
 typedef union 
 {
@@ -171,7 +194,9 @@ typedef union
     synth_type_adsr         stadsr;
     synth_type_lowpass      stlp;
     synth_type_osc          stosc;
-    synth_type_sine_synth   stss;
+    synth_type_vca          stvca;
+    synth_type_mixer        stmixer;
+    synth_type_ring         string;
 } synth_unit;
 
 typedef union 
@@ -181,7 +206,10 @@ typedef union
     synth_parm_adsr         stadsr;
     synth_parm_lowpass      stlp;
     synth_parm_osc          stosc;
-    synth_parm_sine_synth   stss;
+    synth_parm_vca          stvca;
+    synth_parm_mixer        stmixer;
+    synth_parm_ring         string;
+    uint8_t                 structsize[48];
 } synth_parm;
 
 typedef int32_t (synth_type_process)(int32_t sample, int32_t control, synth_parm *sp, synth_unit *su, int note);

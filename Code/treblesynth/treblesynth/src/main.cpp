@@ -451,7 +451,7 @@ static void __no_inline_not_in_flash_func(alarm_func)(uint alarm_num)
         } while (hardware_alarm_set_target(claimed_alarm_num, next_alarm_time));
         return;
     } 
-    int32_t s = synth_process_all_units() / (MAX_POLYPHONY/4);
+    int32_t s = synth_process_all_units() / (MAX_POLYPHONY/2);
     if (s < (-QUANTIZATION_MAX)) s = -QUANTIZATION_MAX;
     if (s > (QUANTIZATION_MAX-1)) s = QUANTIZATION_MAX-1;
     next_sample = (s + QUANTIZATION_MAX) / ((QUANTIZATION_MAX*2) / DAC_PWM_WRAP_VALUE);

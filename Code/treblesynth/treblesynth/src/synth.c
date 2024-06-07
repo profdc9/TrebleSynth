@@ -45,7 +45,6 @@ volatile bool synth_note_stopping_fast[MAX_POLYPHONY];
 uint8_t synth_note_number[MAX_POLYPHONY];
 uint8_t synth_note_velocity[MAX_POLYPHONY];
 uint32_t synth_note_stopping_counter[MAX_POLYPHONY];
-int32_t synth_note_last_sample[MAX_POLYPHONY];
 
 synth_unit synth_units[MAX_POLYPHONY][MAX_SYNTH_UNITS];
 synth_parm synth_parms[MAX_SYNTH_UNITS];
@@ -115,6 +114,13 @@ int32_t synth_type_process_vco(int32_t sample, int32_t control, synth_parm *sp, 
 
 void synth_note_start_vco(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t velocity)
 {
+    if (sp->stvco.octave != 2)
+    {
+        int32_t adjvco = (int32_t) vco + (((int32_t)sp->stvco.octave) - 2) * ((QUANTIZATION_MAX/MIDI_NOTES)*12);
+        while (adjvco < 0) adjvco += ((QUANTIZATION_MAX/MIDI_NOTES)*12);
+        while (adjvco > (QUANTIZATION_MAX-1)) adjvco -= (QUANTIZATION_MAX-1);
+        vco = adjvco;
+    }
     float counter_inc_float = counter_fraction_from_vco(vco);
     su->stvco.counter_inc = counter_inc_float;
     su->stvco.counter_semitone_control_gain = (counter_inc_float * SEMITONE_LOG_STEP) * sp->stvco.control_gain;
@@ -126,11 +132,12 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_vco[] =
     { "ControlUnit", offsetof(synth_parm_vco,control_unit),       4, 2, 1, MAX_SYNTH_UNITS, NULL },
     { "OscType",     offsetof(synth_parm_vco,osc_type),           4, 1, 1, WAVETABLES_NUMBER, NULL },
     { "ControlGain", offsetof(synth_parm_vco,control_gain),       4, 2, 0, 31, NULL },
-    { "Amplitude",   offsetof(synth_parm_vco,amplitude),          4, 3, 0, 255, NULL },        
+    { "Amplitude",   offsetof(synth_parm_vco,amplitude),          4, 3, 0, 256, NULL },        
+    { "Octave",      offsetof(synth_parm_vco,octave),             4, 9, 0, 4, NULL },        
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
-const synth_parm_vco synth_parm_vco_default = { 0, 0, 0, 1, 1, 255 };
+const synth_parm_vco synth_parm_vco_default = { 0, 0, 0, 1, 1, 256, 2 };
 
 /**************************** SYNTH_TYPE_ADSR **************************************************/
 
@@ -209,6 +216,7 @@ const synth_parm_adsr synth_parm_adsr_default = { 0, 0, 0,  2000, 4000, 128, 200
 
 int32_t synth_type_process_lowpass(int32_t sample, int32_t control, synth_parm *sp, synth_unit *su, int note)
 {
+    sample = (sample*((int32_t)(256-sp->stlp.feedback))+su->stlp.stage_y[sp->stlp.stages-1]*((int32_t)sp->stlp.feedback))/256;
     for (int n=0;n<sp->stlp.stages;n++)
     {
         su->stlp.stage_y[n] = sample = ((QUANTIZATION_MAX-su->stlp.alpha)*sample + su->stlp.alpha*su->stlp.stage_y[n]) / QUANTIZATION_MAX;
@@ -226,7 +234,7 @@ void synth_note_start_lowpass(synth_parm *sp, synth_unit *su, uint32_t vco, uint
     float a = (lbw-sqrtf(lbw*lbw-lb*lb)) / lb;
     su->stlp.alpha = (int32_t) (a * QUANTIZATION_MAX);  
     
-    set_debug_vals(su->stlp.alpha, (int32_t)(lbw*1000000.f), (int32_t)(lb*1000000.f));
+   // set_debug_vals(su->stlp.alpha, (int32_t)(lbw*1000000.f), (int32_t)(lb*1000000.f));
 
 }
 
@@ -236,10 +244,11 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_lowpass[] =
     { "ControlUnit", offsetof(synth_parm_lowpass,control_unit),       4, 2, 1, MAX_SYNTH_UNITS, NULL },
     { "KneeFreq",    offsetof(synth_parm_lowpass,kneefreq),           2, 3, 0, 255, NULL },
     { "Stages",      offsetof(synth_parm_lowpass,stages),             4, 1, 0, 6, NULL },
+    { "Feedback",    offsetof(synth_parm_lowpass,feedback),           4, 3, 0, 255, NULL },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
-const synth_parm_lowpass synth_parm_lowpass_default = { 0, 0, 0, 128, 4 };
+const synth_parm_lowpass synth_parm_lowpass_default = { 0, 0, 0, 128, 4, 0 };
 
 /**************************** SYNTH_TYPE_OSC **************************************************/
 
@@ -270,7 +279,7 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_osc[] =
     { "SourceUnit",  offsetof(synth_parm_osc,source_unit),        4, 2, 1, MAX_SYNTH_UNITS, NULL },
     { "ControlUnit", offsetof(synth_parm_osc,control_unit),       4, 2, 1, MAX_SYNTH_UNITS, NULL },
     { "Frequency",   offsetof(synth_parm_osc,frequency),          4, 4, 1, 4000, NULL },
-    { "Amplitude",   offsetof(synth_parm_osc,amplitude),          4, 3, 0, 255,  NULL },
+    { "Amplitude",   offsetof(synth_parm_osc,amplitude),          4, 3, 0, 256,  NULL },
     { "OscType",     offsetof(synth_parm_osc,osc_type),           4, 1, 1, 8, NULL },
     { "ControlGain", offsetof(synth_parm_osc,control_gain),       4, 2, 0, 15, NULL },
     { "BendCtrl",    offsetof(synth_parm_osc,control_bend),       4, 2, 0, POTENTIOMETER_MAX, "BendCtrl" },
@@ -278,79 +287,81 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_osc[] =
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
-const synth_parm_osc synth_parm_osc_default = { 0, 0, 0, 1, 1, 262, 255, 0, 1 };
+const synth_parm_osc synth_parm_osc_default = { 0, 0, 0, 1, 1, 262, 256, 0, 1 };
 
-/******************************SYNTH_TYPE_SINE_SYNTH*******************************************/
+/**************************** SYNTH_TYPE_VCA **************************************************/
 
-int32_t synth_type_process_sin_synth(int32_t sample, int32_t control, synth_parm *sp, synth_unit *su, int note)
+int32_t synth_type_process_vca(int32_t sample, int32_t control, synth_parm *sp, synth_unit *su, int note)
 {
-    uint32_t new_input = read_potentiometer_value(sp->stss.control_number1);
-    if (abs(new_input - su->stss.pot_value1) >= POTENTIOMETER_VALUE_SENSITIVITY)
-    {
-        su->stss.pot_value1 = new_input;
-        sp->stss.frequency[0] = 40 + new_input/(POT_MAX_VALUE/2048);
-    }
-    new_input = read_potentiometer_value(sp->stss.control_number2);
-    if (abs(new_input - su->stss.pot_value2) >= POTENTIOMETER_VALUE_SENSITIVITY)
-    {
-        su->stss.pot_value2 = new_input;
-        sp->stss.amplitude[0] = new_input/(POT_MAX_VALUE/256);
-    }
-    if (sp->stss.frequency[0] != su->stss.last_frequency[0])
-    {
-        su->stss.last_frequency[0] = sp->stss.frequency[0];
-        su->stss.sine_counter_inc[0] = (su->stss.last_frequency[0]*65536) / DSP_SAMPLERATE;
-    }
-    if (sp->stss.frequency[1] != su->stss.last_frequency[1])
-    {
-        su->stss.last_frequency[1] = sp->stss.frequency[1];
-        su->stss.sine_counter_inc[1] = (su->stss.last_frequency[1]*65536) / DSP_SAMPLERATE;
-    }
-    if (sp->stss.frequency[2] != su->stss.last_frequency[2])
-    {
-        su->stss.last_frequency[2] = sp->stss.frequency[2];
-        su->stss.sine_counter_inc[2] = (su->stss.last_frequency[2]*65536) / DSP_SAMPLERATE;
-    }
-    uint ct = 1;
-    int32_t sine_val = sample * ((int32_t)sp->stss.mixval);
-    for (uint i=0;i<(sizeof(su->stss.sine_counter)/sizeof(su->stss.sine_counter[0]));i++)
-    {
-        if (sp->stss.amplitude[i] != 0) 
-        {
-            su->stss.sine_counter[i] += su->stss.sine_counter_inc[i];
-            int32_t val = sine_table_entry((su->stss.sine_counter[i] & 0xFFFF) / 256) / (QUANTIZATION_MAX / (ADC_PREC_VALUE/2));
-            sine_val += val * ((int32_t)sp->stss.amplitude[i]);
-            ct++;
-        }
-    }
-    if (ct > 2)
-        sine_val /= (256 * 4);
-    else if (ct > 1)
-        sine_val /= (256 * 2);
-    else sine_val /= 256;
-    return sine_val;
+    control = (control * ((int32_t)sp->stvca.control_gain)) / 256;
+    sample = (sample * ((control + QUANTIZATION_MAX)/2)) / QUANTIZATION_MAX;
+    sample = (sample * ((int32_t)sp->stvca.amplitude)) / 256;
+    return sample;
 }
 
-void synth_note_start_sin_synth(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t velocity)
+void synth_note_start_vca(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t velocity)
 {
 }
 
-const synth_parm_configuration_entry synth_parm_configuration_entry_sin_synth[] = 
+const synth_parm_configuration_entry synth_parm_configuration_entry_vca[] = 
 {
-    { "Freq1",        offsetof(synth_parm_sine_synth,frequency[0]),     4, 4, 100, 4000, NULL },
-    { "Amplitude1",   offsetof(synth_parm_sine_synth,amplitude[0]),     4, 3, 0,   255, NULL  },
-    { "Freq2",        offsetof(synth_parm_sine_synth,frequency[1]),     4, 4, 100, 4000, NULL },
-    { "Amplitude2",   offsetof(synth_parm_sine_synth,amplitude[1]),     4, 3, 0,   255, NULL },
-    { "Freq3",        offsetof(synth_parm_sine_synth,frequency[2]),     4, 4, 100, 4000, NULL },
-    { "Amplitude3",   offsetof(synth_parm_sine_synth,amplitude[2]),     4, 3, 0,   255, NULL },
-    { "Mixval",       offsetof(synth_parm_sine_synth,mixval),           4, 4, 0,   255, NULL },
-    { "FreqCtrl",     offsetof(synth_parm_sine_synth,control_number1),  4, 2, 0, POTENTIOMETER_MAX, "OscFreq" },
-    { "AmpCtrl",      offsetof(synth_parm_sine_synth,control_number2),  4, 2, 0, POTENTIOMETER_MAX, "OscAmp" },
-    { "SourceUnit",   offsetof(synth_parm_sine_synth,source_unit),      4, 2, 1, MAX_SYNTH_UNITS },
+    { "SourceUnit",  offsetof(synth_parm_vca,source_unit),        4, 2, 1, MAX_SYNTH_UNITS, NULL },
+    { "ControlUnit", offsetof(synth_parm_vca,control_unit),       4, 2, 1, MAX_SYNTH_UNITS, NULL },
+    { "ControlGain", offsetof(synth_parm_vca,control_gain),       4, 3, 0, 256, NULL },
+    { "Amplitude",   offsetof(synth_parm_vca,amplitude),          4, 3, 0, 256, NULL },        
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
-const synth_parm_sine_synth synth_parm_sine_synth_default = { 0, 0, 0, 255, { 300, 300, 300}, {255, 0, 0}, 0, 0 };
+const synth_parm_vca synth_parm_vca_default = { 0, 0, 0, 256, 256 };
+
+/**************************** SYNTH_TYPE_MIXER **************************************************/
+
+int32_t synth_type_process_mixer(int32_t sample, int32_t control, synth_parm *sp, synth_unit *su, int note)
+{
+    int32_t other_sample = synth_unit_result[note][sp->stmixer.source2_unit-1];
+    sample = (sample * ((int32_t) sp->stmixer.mixval) + other_sample * ((int32_t) (256-sp->stmixer.mixval))) / 256;
+    sample = (sample * ((int32_t) sp->stmixer.amplitude)) / 256;
+    return sample;
+}
+
+void synth_note_start_mixer(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t velocity)
+{
+}
+
+const synth_parm_configuration_entry synth_parm_configuration_entry_mixer[] = 
+{
+    { "SourceUnit",   offsetof(synth_parm_mixer,source_unit),        4, 2, 1, MAX_SYNTH_UNITS, NULL },
+    { "ControlUnit",  offsetof(synth_parm_mixer,control_unit),       4, 2, 1, MAX_SYNTH_UNITS, NULL },
+    { "Source2Unit",  offsetof(synth_parm_mixer,source2_unit) ,      4, 2, 1, MAX_SYNTH_UNITS, NULL },
+    { "Mixval",       offsetof(synth_parm_mixer,mixval),             4, 3, 0, 256, NULL },        
+    { "Amplitude",    offsetof(synth_parm_mixer,amplitude),          4, 3, 0, 256, NULL },        
+    { NULL, 0, 4, 0, 0,   1, NULL    }
+};
+
+const synth_parm_mixer synth_parm_mixer_default = { 0, 0, 0, 1, 128, 256 };
+
+/**************************** SYNTH_TYPE_RING **************************************************/
+
+int32_t synth_type_process_ring(int32_t sample, int32_t control, synth_parm *sp, synth_unit *su, int note)
+{
+    sample = (sample * control) / QUANTIZATION_MAX;
+    sample = (sample * ((int32_t)sp->string.amplitude)) / 256;
+    return sample;
+}
+
+void synth_note_start_ring(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t velocity)
+{
+}
+
+const synth_parm_configuration_entry synth_parm_configuration_entry_ring[] = 
+{
+    { "SourceUnit",  offsetof(synth_parm_ring,source_unit),        4, 2, 1, MAX_SYNTH_UNITS, NULL },
+    { "ControlUnit", offsetof(synth_parm_ring,control_unit),       4, 2, 1, MAX_SYNTH_UNITS, NULL },
+    { "Amplitude",   offsetof(synth_parm_ring,amplitude),          4, 3, 0, 256, NULL },        
+    { NULL, 0, 4, 0, 0,   1, NULL    }
+};
+
+const synth_parm_ring synth_parm_ring_default = { 0, 0, 0, 256 };
 
 /************STRUCTURES FOR ALL SYNTH TYPES *****************************/
 
@@ -361,7 +372,9 @@ const char * const stnames[] =
     "ADSR",
     "Lowpass",
     "Osc",
-    "Sin Synth",
+    "VCA",
+    "Mixer",
+    "Ring",
     NULL
 };
 
@@ -372,7 +385,9 @@ const synth_parm_configuration_entry * const spce[] =
     synth_parm_configuration_entry_adsr,
     synth_parm_configuration_entry_lowpass,
     synth_parm_configuration_entry_osc,
-    synth_parm_configuration_entry_sin_synth, 
+    synth_parm_configuration_entry_vca,
+    synth_parm_configuration_entry_mixer,
+    synth_parm_configuration_entry_ring,
     NULL
 };
 
@@ -382,7 +397,9 @@ synth_type_process * const stp[] = {
     synth_type_process_adsr,
     synth_type_process_lowpass,
     synth_type_process_osc,
-    synth_type_process_sin_synth,
+    synth_type_process_vca,
+    synth_type_process_mixer,
+    synth_type_process_ring,
 };
 
 synth_note_start * const sns[] = 
@@ -392,7 +409,9 @@ synth_note_start * const sns[] =
     synth_note_start_adsr,
     synth_note_start_lowpass,
     synth_note_start_osc,
-    synth_note_start_sin_synth
+    synth_note_start_vca,
+    synth_note_start_mixer,
+    synth_note_start_ring,
 };
 
 const void * const synth_parm_struct_defaults[] =
@@ -402,7 +421,9 @@ const void * const synth_parm_struct_defaults[] =
     (void *) &synth_parm_adsr_default,
     (void *) &synth_parm_lowpass_default,
     (void *) &synth_parm_osc_default,
-    (void *) &synth_parm_sine_synth_default
+    (void *) &synth_parm_vca_default,
+    (void *) &synth_parm_mixer_default,
+    (void *) &synth_parm_ring_default,
 };
 
 /********************* SYNTH PROCESS STRUCTURE *******************************************/
@@ -503,7 +524,7 @@ void synth_start_note(uint8_t note_no, uint8_t velocity)
         if ((synth_note_active[note]) && (synth_note_number[note] == note_no))
         {
             mutex_enter_blocking(&note_mutexes[note]);
-            synth_note_stopping_counter[note] = 512;
+            synth_note_stopping_counter[note] = SYNTH_STOPPING_COUNTER;
             DMB();
             synth_note_stopping_fast[note] = true;
             DMB();
@@ -528,7 +549,6 @@ void synth_start_note(uint8_t note_no, uint8_t velocity)
             synth_note_stopping[note] = false;
             synth_note_stopping_fast[note] = false;
             synth_note_stopping_counter[note] = 0;
-            synth_note_last_sample[note] = 0;
             DMB();
             synth_note_active[note] = true;
             DMB();
@@ -565,7 +585,6 @@ void synth_initialize(void)
         synth_note_stopping_counter[note] = 0;
         synth_note_number[note] = 0;
         synth_note_velocity[note] = 0;
-        synth_note_last_sample[note] = 0;
         mutex_init(&note_mutexes[note]);
     }
     for (int unit_number=0;unit_number<MAX_SYNTH_UNITS;unit_number++) 
@@ -588,19 +607,18 @@ int32_t synth_process_all_units(void)
                 int32_t control_prev = synth_unit_result[note][sp->stn.control_unit-1];
                 synth_unit_result[note][unit_no+1] = synth_process(source_prev, control_prev, sp, su, note);
             }
+            int32_t sample = synth_unit_result[note][MAX_SYNTH_UNITS];
             if (synth_note_stopping_fast[note])
             {
                if (synth_note_stopping_counter[note] > 0)
                {
-                   synth_note_stopping_counter[note]--;
-                   synth_note_last_sample[note] = (synth_note_last_sample[note]*127)/128;
-                   total_sample += synth_note_last_sample[note];                   
+                    synth_note_stopping_counter[note]--;
+                    total_sample += (sample * ((int32_t)synth_note_stopping_counter[note])) / SYNTH_STOPPING_COUNTER;
                } else
-                   synth_note_active[note] = false;
+                    synth_note_active[note] = false;
             } else
             {
-                synth_note_last_sample[note] = synth_unit_result[note][MAX_SYNTH_UNITS];
-                total_sample += synth_note_last_sample[note];
+                total_sample += sample;
                 if (synth_note_stopping[note])
                 {
                     if (synth_note_stopping_counter[note] > 0)
