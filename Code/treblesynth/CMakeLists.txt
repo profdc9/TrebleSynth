@@ -22,4 +22,6 @@ set(EXECUTABLE_OUTPUT_PATH "build")
 # Add the examples
 add_subdirectory(treblesynth)
 
+set_target_properties(treblesynth PROPERTIES COMPILE_FLAGS "--save-temps")
+
 pico_set_boot_stage2(treblesynth slower_boot2)

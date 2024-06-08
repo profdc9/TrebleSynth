@@ -25,6 +25,8 @@
 #ifndef _TREBLESYNTH_H
 #define _TREBLESYNTH_H
 
+#define PLACE_IN_RAM
+
 #define POTENTIOMETER_MAX 23
 
 #include "hardware/pio.h"
@@ -72,6 +74,12 @@
 #define GPIO_BUTTON4 22
 
 #define POT_MAX_VALUE 16384u
+
+#define FLASH_BANKS 10
+#define FLASH_PAGE_BYTES 4096u
+#define FLASH_OFFSET_STORED (2*1024*1024)
+#define FLASH_BASE_ADR 0x10000000
+#define FLASH_MAGIC_NUMBER 0xFEE1FED9
 
 #ifndef LED_PIN
 #define LED_PIN 25

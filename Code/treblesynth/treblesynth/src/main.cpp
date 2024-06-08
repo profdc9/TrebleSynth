@@ -431,7 +431,11 @@ inline void poll_controls(void)
    }   
 }
 
+#ifdef PLACE_IN_RAM
 static void __no_inline_not_in_flash_func(alarm_func)(uint alarm_num)
+#else
+static void alarm_func(uint alarm_num)
+#endif
 {
     static uint ticktock = 0;
     absolute_time_t next_alarm_time;
@@ -451,7 +455,7 @@ static void __no_inline_not_in_flash_func(alarm_func)(uint alarm_num)
         } while (hardware_alarm_set_target(claimed_alarm_num, next_alarm_time));
         return;
     } 
-    int32_t s = synth_process_all_units() / (MAX_POLYPHONY/2);
+    int32_t s = synth_process_all_units();
     if (s < (-QUANTIZATION_MAX)) s = -QUANTIZATION_MAX;
     if (s > (QUANTIZATION_MAX-1)) s = QUANTIZATION_MAX-1;
     next_sample = (s + QUANTIZATION_MAX) / ((QUANTIZATION_MAX*2) / DAC_PWM_WRAP_VALUE);
@@ -810,12 +814,6 @@ void adjust_synth_params(void)
         }
     }
 }
-
-#define FLASH_BANKS 10
-#define FLASH_PAGE_BYTES 4096u
-#define FLASH_OFFSET_STORED (2*1024*1024)
-#define FLASH_BASE_ADR 0x10000000
-#define FLASH_MAGIC_NUMBER 0xFEE1FED8
 
 #define FLASH_PAGES(x) ((((x)+(FLASH_PAGE_BYTES-1))/FLASH_PAGE_BYTES)*FLASH_PAGE_BYTES)
 
@@ -1611,7 +1609,7 @@ void configuration(void)
   clear_display();
   uint8_t selected;
 
-  write_str(0,2,"Configuration");
+  write_str(0,0,"Configuration");
   menu_str mn = { confmenu, 0, 3, 16, 0, 0 };
   do_show_menu_item(&mn);
   for (;;)

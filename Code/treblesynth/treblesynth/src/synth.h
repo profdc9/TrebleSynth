@@ -36,8 +36,9 @@ extern "C"
 #define MIDI_FREQUENCY_0 8.17579891564f
 #define MIDI_NOTES 128
 
-#define MAX_POLYPHONY 8
-#define MAX_SYNTH_UNITS 16
+#define MAX_POLYPHONY 6
+#define DIVIDER_POLYPHONY 2
+#define MAX_SYNTH_UNITS 10
 #define SYNTH_OSCILLATOR_PRECISION 256
 #define SYNTH_STOPPING_COUNTER 256
 
@@ -72,9 +73,10 @@ typedef struct
     uint32_t source_unit;
     uint32_t control_unit;
     uint32_t osc_type;
-    uint32_t control_gain;
-    uint32_t amplitude;
-    uint32_t octave;
+    int32_t  control_gain;
+    int32_t  amplitude;
+    int32_t  octave;
+    uint32_t control_amplitude;
 } synth_parm_vco;
 
 typedef struct
@@ -118,13 +120,13 @@ typedef struct
     uint32_t control_unit;
     uint32_t kneefreq;
     uint32_t stages;
-    uint32_t feedback;
+    uint32_t control_kneefreq;
 } synth_parm_lowpass;
 
 typedef struct
 {
     int32_t   alpha;
-    int32_t   stage_y[6];
+    int32_t   stage_y[4];
 } synth_type_lowpass;
 
 typedef struct
@@ -133,11 +135,13 @@ typedef struct
     uint32_t source_unit;
     uint32_t control_unit;
     uint32_t osc_type;
-    uint32_t control_gain;
+    int32_t  control_gain;
     uint32_t frequency;
-    uint32_t amplitude;
+    int32_t  amplitude;
     uint32_t control_bend;
     uint32_t bend_gain;
+    uint32_t control_frequency;
+    uint32_t control_amplitude;
 } synth_parm_osc;
 
 typedef struct
@@ -153,8 +157,9 @@ typedef struct
     synth_unit_type sut;
     uint32_t source_unit;
     uint32_t control_unit;
-    uint32_t control_gain;
-    uint32_t amplitude;
+    int32_t  control_gain;
+    int32_t  amplitude;
+    uint32_t control_amplitude;
 } synth_parm_vca;
 
 typedef struct
@@ -167,8 +172,10 @@ typedef struct
     uint32_t source_unit;
     uint32_t control_unit;
     uint32_t source2_unit;
-    uint32_t mixval;
-    uint32_t amplitude;
+    int32_t  mixval;
+    int32_t  amplitude;
+    uint32_t control_mixval;
+    uint32_t control_amplitude;
 } synth_parm_mixer;
 
 typedef struct
@@ -180,7 +187,8 @@ typedef struct
     synth_unit_type sut;
     uint32_t source_unit;
     uint32_t control_unit;
-    uint32_t amplitude;
+    int32_t  amplitude;
+    uint32_t control_amplitude;
 } synth_parm_ring;
 
 typedef struct
@@ -209,7 +217,6 @@ typedef union
     synth_parm_vca          stvca;
     synth_parm_mixer        stmixer;
     synth_parm_ring         string;
-    uint8_t                 structsize[48];
 } synth_parm;
 
 typedef int32_t (synth_type_process)(int32_t sample, int32_t control, synth_parm *sp, synth_unit *su, int note);
@@ -220,8 +227,8 @@ void synth_unit_struct_zero(synth_unit *su);
 void synth_unit_initialize(int synth_unit_number, synth_unit_type dut);
 
 extern const void * const synth_parm_struct_defaults[];
-extern synth_parm synth_parms[MAX_DSP_UNITS];
-extern synth_unit synth_units[MAX_POLYPHONY][MAX_DSP_UNITS];
+extern synth_parm synth_parms[MAX_SYNTH_UNITS];
+extern synth_unit synth_units[MAX_POLYPHONY][MAX_SYNTH_UNITS];
 
 inline synth_unit *synth_unit_entry(uint m, uint e)
 {
