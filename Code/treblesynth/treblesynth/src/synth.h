@@ -37,7 +37,7 @@ extern "C"
 #define MIDI_NOTES 128
 
 #define MAX_POLYPHONY 6
-#define DIVIDER_POLYPHONY 2
+#define DIVIDER_POLYPHONY 4
 #define MAX_SYNTH_UNITS 10
 #define SYNTH_OSCILLATOR_PRECISION 256
 #define SYNTH_STOPPING_COUNTER 256
@@ -268,6 +268,8 @@ void synth_initialize(void);
 
 void synth_start_note(uint8_t note_no, uint8_t velocity);
 void synth_stop_note(uint8_t note_no, uint8_t velocity);
+
+void synth_panic(void);
 
 #ifdef __cplusplus
 }

@@ -46,10 +46,10 @@
 #define UART_TX_PIN 0
 #define UART_RX_PIN 1
 
-#define DAC_PWM_A3 15
-#define DAC_PWM_A2 14
-#define DAC_PWM_A1 13
-#define DAC_PWM_A0 12
+#define DAC_PWM_A3 9
+#define DAC_PWM_A2 8
+#define DAC_PWM_A1 7
+#define DAC_PWM_A0 6
 
 #define DAC_PWM_B3 15
 #define DAC_PWM_B2 14

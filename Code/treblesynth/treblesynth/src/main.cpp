@@ -1156,7 +1156,7 @@ void debugstuff(void)
     }
 }
 
-const char * const mainmenu[] = { "SynthAdj", "FiltAdjust", "Debug", "Pedal", "Load", "Save", "Conf", NULL };
+const char * const mainmenu[] = { "SynthAdj", "FiltAdjust", "Panic", "Debug", "Pedal", "Load", "Save", "Conf", NULL };
 
 menu_str mainmenu_str = { mainmenu, 0, 2, 15, 0, 0 };
 
@@ -1717,15 +1717,17 @@ int main()
                      break;
             case 1:  adjust_dsp_params();
                      break;
-            case 2:  debugstuff();
+            case 2:  synth_panic();
                      break;
-            case 3:  pedal_control_cmd();
+            case 3:  debugstuff();
                      break;
-            case 4:  flash_load();
+            case 4:  pedal_control_cmd();
                      break;
-            case 5:  flash_save();
+            case 5:  flash_load();
                      break;
-            case 6:  configuration();
+            case 6:  flash_save();
+                     break;
+            case 7:  configuration();
                      break;
         }
     }

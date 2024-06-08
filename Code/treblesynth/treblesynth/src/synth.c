@@ -604,7 +604,6 @@ void synth_start_note(uint8_t note_no, uint8_t velocity)
     {
         if (!synth_note_active[note])
         {
-            mutex_enter_blocking(&note_mutexes[note]);
             for (int unit_no=0;unit_no<MAX_SYNTH_UNITS;unit_no++)
             {
                 synth_unit *su = synth_unit_entry(note, unit_no);
@@ -618,6 +617,7 @@ void synth_start_note(uint8_t note_no, uint8_t velocity)
             synth_note_stopping_fast[note] = false;
             synth_note_stopping_counter[note] = 0;
             DMB();
+            mutex_enter_blocking(&note_mutexes[note]);
             synth_note_active[note] = true;
             DMB();
             mutex_exit(&note_mutexes[note]);
@@ -638,6 +638,20 @@ void synth_stop_note(uint8_t note_no, uint8_t velocity)
             DMB();
             mutex_exit(&note_mutexes[note]);
             return;
+        }
+}
+
+void synth_panic(void)
+{
+    for (int note=0;note<MAX_POLYPHONY;note++)
+        if (synth_note_active[note])
+        {
+            synth_note_stopping_counter[note] = pc.fail_delay;
+            DMB();
+            mutex_enter_blocking(&note_mutexes[note]);
+            synth_note_stopping[note] = true;
+            DMB();
+            mutex_exit(&note_mutexes[note]);
         }
 }
 
