@@ -124,6 +124,8 @@ void synth_note_start_vco(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t
 {
     if (sp->stvco.control_amplitude != 0)
         sp->stvco.amplitude = read_potentiometer_value(sp->stvco.control_amplitude)/(POT_MAX_VALUE/256);
+    if (sp->stvco.control_control_gain != 0)
+        sp->stvco.control_gain = read_potentiometer_value(sp->stvco.control_control_gain)/(POT_MAX_VALUE/32);
 
     if (sp->stvco.octave != 2)
     {
@@ -139,13 +141,14 @@ void synth_note_start_vco(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t
 
 const synth_parm_configuration_entry synth_parm_configuration_entry_vco[] = 
 {
-    { "SourceUnit",  offsetof(synth_parm_vco,source_unit),        4, 2, 1, MAX_SYNTH_UNITS, NULL },
-    { "ControlUnit", offsetof(synth_parm_vco,control_unit),       4, 2, 1, MAX_SYNTH_UNITS, NULL },
-    { "OscType",     offsetof(synth_parm_vco,osc_type),           4, 1, 1, WAVETABLES_NUMBER, NULL },
-    { "ControlGain", offsetof(synth_parm_vco,control_gain),       4, 2, 0, 31, NULL },
-    { "Amplitude",   offsetof(synth_parm_vco,amplitude),          4, 3, 0, 256, NULL },        
-    { "Octave",      offsetof(synth_parm_vco,octave),             4, 1, 0, 4, NULL },        
-    { "AmplCtrl",    offsetof(synth_parm_vco,control_amplitude),  4, 2, 0, POTENTIOMETER_MAX, "Amplitude" },
+    { "SourceUnit",  offsetof(synth_parm_vco,source_unit),           4, 2, 1, MAX_SYNTH_UNITS, NULL },
+    { "ControlUnit", offsetof(synth_parm_vco,control_unit),          4, 2, 1, MAX_SYNTH_UNITS, NULL },
+    { "OscType",     offsetof(synth_parm_vco,osc_type),              4, 1, 1, WAVETABLES_NUMBER, NULL },
+    { "ControlGain", offsetof(synth_parm_vco,control_gain),          4, 2, 0, 31, NULL },
+    { "Amplitude",   offsetof(synth_parm_vco,amplitude),             4, 3, 0, 256, NULL },        
+    { "Octave",      offsetof(synth_parm_vco,octave),                4, 1, 0, 4, NULL },        
+    { "AmplCtrl",    offsetof(synth_parm_vco,control_amplitude),     4, 2, 0, POTENTIOMETER_MAX, "Amplitude" },
+    { "GainCtrl",    offsetof(synth_parm_vco,control_control_gain),  4, 2, 0, POTENTIOMETER_MAX, "CtrlGain" },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 

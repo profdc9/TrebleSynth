@@ -230,10 +230,61 @@ void initialize_uart(void)
     irq_set_enabled(UART0_IRQ, true);
 }
 
+inline void poll_potentiometers_and_buttons(void)
+{
+   static uint32_t last_us;
+   uint32_t current_us;
+   uint current_sample_no;
+   uint16_t sample;  
+  
+   current_us = time_us_32();
+   if ((current_us - last_us) < 5000) return;
+   last_us = current_us;
+
+   current_sample_no = current_input+control_sample_no*8;
+   sample = adc_hw->result;
+
+   if ( (sample > (current_samples[current_sample_no] + POTENTIOMETER_VALUE_SENSITIVITY)) || 
+        (current_samples[current_sample_no] > (sample + POTENTIOMETER_VALUE_SENSITIVITY)) )
+   {
+       sample_changed[current_sample_no] = true;
+       current_samples[current_sample_no] = sample;
+   }
+
+   if (control_enabled[current_sample_no])
+       samples[current_sample_no] = sample;
+   else
+   {
+       if ( ((control_direction[current_sample_no]) && (sample >= last_samples[current_sample_no])) ||
+            ((!control_direction[current_sample_no]) && (sample <= last_samples[current_sample_no])) )
+            {
+                samples[current_sample_no] = sample;
+                control_enabled[current_sample_no] = true;
+            }
+   }
+   
+   button_state[current_input] = gpio_get(GPIO_BUTTON1);
+   button_state[current_input+8] = gpio_get(GPIO_BUTTON2);
+   button_state[current_input+16] = gpio_get(GPIO_BUTTON3);
+   button_state[current_input+24] = gpio_get(GPIO_BUTTON4);
+   
+   current_input = (current_input + 1) & 0x07;
+   gpio_put(GPIO_ADC_SEL0, (current_input & 0x01) == 0);
+   gpio_put(GPIO_ADC_SEL1, (current_input & 0x02) == 0);
+   gpio_put(GPIO_ADC_SEL2, (current_input & 0x04) == 0);
+   if (current_input == 0)
+   {
+     if ((++control_sample_no) >= 3)
+         control_sample_no = 0;
+     adc_select_input(control_sample_no);
+   }   
+}
+
 void idle_task(void)
 {
     usb_task();
     midi_uart_poll();
+    poll_potentiometers_and_buttons();
     buttons_poll();
     keyboard_poll();
     controls_poll();
@@ -390,77 +441,24 @@ void reset_control_samples(uint16_t *reset_samples)
     }
 }
 
-inline void poll_controls(void)
-{
-   uint current_sample_no = current_input+control_sample_no*8;
-   uint16_t sample = adc_hw->result;
-
-   if ( (sample > (current_samples[current_sample_no] + POTENTIOMETER_VALUE_SENSITIVITY)) || 
-        (current_samples[current_sample_no] > (sample + POTENTIOMETER_VALUE_SENSITIVITY)) )
-   {
-       sample_changed[current_sample_no] = true;
-       current_samples[current_sample_no] = sample;
-   }
-
-   if (control_enabled[current_sample_no])
-       samples[current_sample_no] = sample;
-   else
-   {
-       if ( ((control_direction[current_sample_no]) && (sample >= last_samples[current_sample_no])) ||
-            ((!control_direction[current_sample_no]) && (sample <= last_samples[current_sample_no])) )
-            {
-                samples[current_sample_no] = sample;
-                control_enabled[current_sample_no] = true;
-            }
-   }
-   
-   button_state[current_input] = gpio_get(GPIO_BUTTON1);
-   button_state[current_input+8] = gpio_get(GPIO_BUTTON2);
-   button_state[current_input+16] = gpio_get(GPIO_BUTTON3);
-   button_state[current_input+24] = gpio_get(GPIO_BUTTON4);
-   
-   current_input = (current_input + 1) & 0x07;
-   gpio_put(GPIO_ADC_SEL0, (current_input & 0x01) == 0);
-   gpio_put(GPIO_ADC_SEL1, (current_input & 0x02) == 0);
-   gpio_put(GPIO_ADC_SEL2, (current_input & 0x04) == 0);
-   if (current_input == 0)
-   {
-     if ((++control_sample_no) >= 3)
-         control_sample_no = 0;
-     adc_select_input(control_sample_no);
-   }   
-}
-
 #ifdef PLACE_IN_RAM
 static void __no_inline_not_in_flash_func(alarm_func)(uint alarm_num)
 #else
 static void alarm_func(uint alarm_num)
 #endif
 {
-    static uint ticktock = 0;
     absolute_time_t next_alarm_time;
 
-    if (ticktock)
-    {
-        pwm_set_both_levels(dac_pwm_b3_slice_num, next_sample, next_sample);
-        pwm_set_both_levels(dac_pwm_b1_slice_num, next_sample, next_sample);
-        pwm_set_both_levels(dac_pwm_a3_slice_num, next_sample, next_sample);
-        pwm_set_both_levels(dac_pwm_a1_slice_num, next_sample, next_sample);
-        poll_controls();
-        ticktock = 0;
-        last_time = delayed_by_us(last_time, 10);
-        do
-        {
-            next_alarm_time = update_next_timeout(last_time, 0, 8);
-        } while (hardware_alarm_set_target(claimed_alarm_num, next_alarm_time));
-        return;
-    } 
+    pwm_set_both_levels(dac_pwm_b3_slice_num, next_sample, next_sample);
+    pwm_set_both_levels(dac_pwm_b1_slice_num, next_sample, next_sample);
+    pwm_set_both_levels(dac_pwm_a3_slice_num, next_sample, next_sample);
+    pwm_set_both_levels(dac_pwm_a1_slice_num, next_sample, next_sample);
+
     int32_t s = synth_process_all_units();
     if (s < (-QUANTIZATION_MAX)) s = -QUANTIZATION_MAX;
     if (s > (QUANTIZATION_MAX-1)) s = QUANTIZATION_MAX-1;
     next_sample = (s + QUANTIZATION_MAX) / ((QUANTIZATION_MAX*2) / DAC_PWM_WRAP_VALUE);
-    ticktock = 1;
-    last_time = delayed_by_us(last_time, 30);
+    last_time = delayed_by_us(last_time, 40);
     do
     {
         next_alarm_time = update_next_timeout(last_time, 0, 8);
@@ -738,6 +736,7 @@ void adjust_synth_parms_unit(uint8_t unit_no)
                     {
                         synth_unit_initialize(unit_no, (synth_unit_type)mst.item);
                         synth_unit_reset_all();
+                        update_control_values();
                     }
                 }
             } else

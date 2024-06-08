@@ -77,6 +77,7 @@ typedef struct
     int32_t  amplitude;
     int32_t  octave;
     uint32_t control_amplitude;
+    uint32_t control_control_gain;
 } synth_parm_vco;
 
 typedef struct
