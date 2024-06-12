@@ -64,7 +64,7 @@ typedef struct
 
 typedef struct
 {
-    uint32_t notused;
+    int32_t  *sample_ptr;
 } synth_type_none;
 
 typedef struct
@@ -75,7 +75,7 @@ typedef struct
     uint32_t osc_type;
     int32_t  control_gain;
     int32_t  amplitude;
-    int32_t  octave;
+    int32_t  harmonic;
     uint32_t control_amplitude;
     uint32_t control_control_gain;
 } synth_parm_vco;
@@ -85,6 +85,8 @@ typedef struct
     uint32_t counter;
     uint32_t counter_inc;
     int32_t  counter_semitone_control_gain;
+    int32_t  *control_ptr;
+    const int16_t *wave;
 } synth_type_vco;    
 
 typedef struct
@@ -105,6 +107,7 @@ typedef struct
 
 typedef struct
 {
+    int32_t  *sample_ptr;
     uint32_t phase;
     uint32_t counter;
     uint32_t max_amp_level;
@@ -126,7 +129,9 @@ typedef struct
 
 typedef struct
 {
+    int32_t   *sample_ptr;
     int32_t   alpha;
+    int32_t   dalpha;
     int32_t   stage_y[4];
 } synth_type_lowpass;
 
@@ -151,6 +156,8 @@ typedef struct
     uint32_t counter_inc;
     int32_t  counter_semitone_control_gain;
     int32_t  counter_semitone_bend_gain;
+    int32_t  *control_ptr;
+    const int16_t *wave;
 } synth_type_osc;    
 
 typedef struct
@@ -165,6 +172,8 @@ typedef struct
 
 typedef struct
 {
+    int32_t  *sample_ptr;
+    int32_t  *control_ptr;
 } synth_type_vca;    
 
 typedef struct
@@ -181,6 +190,9 @@ typedef struct
 
 typedef struct
 {
+    int32_t  emixval;
+    int32_t  *sample_ptr;
+    int32_t  *sample2_ptr;
 } synth_type_mixer;
 
 typedef struct
@@ -194,6 +206,8 @@ typedef struct
 
 typedef struct
 {
+    int32_t  *sample_ptr;
+    int32_t  *control_ptr;
 } synth_type_ring;    
 
 typedef union 
@@ -220,8 +234,8 @@ typedef union
     synth_parm_ring         string;
 } synth_parm;
 
-typedef int32_t (synth_type_process)(int32_t sample, int32_t control, synth_parm *sp, synth_unit *su, int note);
-typedef void (synth_note_start)(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t velocity);
+typedef int32_t (synth_type_process)(synth_parm *sp, synth_unit *su, int note);
+typedef void (synth_note_start)(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t velocity, int note);
 
 int32_t synth_process_all_units(void);
 void synth_unit_struct_zero(synth_unit *su);
