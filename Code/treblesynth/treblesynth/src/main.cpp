@@ -40,6 +40,9 @@
 #define NUMBER_OF_CONTROLS 24
 #define CONTROL_VALUE_LENGTH 16
 
+volatile bool waiting_for_sample = false;
+volatile uint16_t next_sample = 0;
+
 uint16_t current_samples[NUMBER_OF_CONTROLS];
 uint16_t samples[NUMBER_OF_CONTROLS];
 uint16_t changed_samples[NUMBER_OF_CONTROLS];
@@ -50,12 +53,10 @@ bool control_enabled[NUMBER_OF_CONTROLS];
 
 char control_value[NUMBER_OF_CONTROLS][CONTROL_VALUE_LENGTH];
 
-uint current_input;
-uint control_sample_no;
+uint current_input = 0;
+uint control_sample_no = 0;
 
 const int potentiometer_mapping[POTENTIOMETER_MAX] = { 1,2,3,4,6,7,5,10,9,8,11,12,14,15,13,18,17,16,19,20,22,23,21 };
-
-uint32_t mag_avg;
 
 uint button_state[NUM_BUTTONS];
 const uint button_ind[NUM_BUTTONS] = { 29,25,30,28,31,27,26,  2,1,0,3,4,6,7,5,  10,9,8,11,12,14,15,13, 18,17,16,19,20,22,23,21,24   };
@@ -74,6 +75,7 @@ bool pause_poll_keyboard = false;
 bool pause_poll_controls = false;
 
 void update_control_values(void);
+void reset_control_samples_core(uint16_t *reset_samples);
 
 project_configuration pc;
 
@@ -380,8 +382,6 @@ uint16_t read_potentiometer_value(uint v)
     return (uint16_t)(samples[potentiometer_mapping[v-1]]*(POT_MAX_VALUE/ADC_MAX_VALUE));
 }
 
-volatile uint16_t next_sample = 0;
-
 absolute_time_t last_time;
 
 static inline absolute_time_t update_next_timeout(const absolute_time_t last_time, uint32_t us, uint32_t min_us)
@@ -447,8 +447,34 @@ static void __no_inline_not_in_flash_func(alarm_func)(uint alarm_num)
 static void alarm_func(uint alarm_num)
 #endif
 {
+    static int32_t sample_avg;
+    static int16_t next_sample2;
+
     absolute_time_t next_alarm_time;
 
+    int16_t s = next_sample;
+    waiting_for_sample = false;
+
+    pwm_set_both_levels(dac_pwm_b3_slice_num, next_sample2, next_sample2);
+    pwm_set_both_levels(dac_pwm_b1_slice_num, next_sample2, next_sample2);
+    pwm_set_both_levels(dac_pwm_a3_slice_num, next_sample2, next_sample2);
+    pwm_set_both_levels(dac_pwm_a1_slice_num, next_sample2, next_sample2);
+
+    s = (s - (ADC_MAX_VALUE/2))*(ADC_PREC_VALUE/ADC_MAX_VALUE);
+    sample_avg = (sample_avg*511)/512 + s;
+    s -= (sample_avg / 512);
+    if (s < (-ADC_PREC_VALUE/2)) s = (-ADC_PREC_VALUE/2);
+    if (s > (ADC_PREC_VALUE/2-1)) s = (ADC_PREC_VALUE/2-1);
+    insert_sample_circ_buf_clean(s);
+    s = dsp_process_all_units(s);
+    insert_sample_circ_buf(s);
+    if (s > (ADC_PREC_VALUE/2-1)) next_sample2 = DAC_PWM_WRAP_VALUE-1;
+    else if (s < (-ADC_PREC_VALUE/2)) next_sample2 = 0;
+    else next_sample2 = (s+(ADC_PREC_VALUE/2)) / (ADC_PREC_VALUE/DAC_PWM_WRAP_VALUE);
+
+    counter++;
+
+#if 0
     pwm_set_both_levels(dac_pwm_b3_slice_num, next_sample, next_sample);
     pwm_set_both_levels(dac_pwm_b1_slice_num, next_sample, next_sample);
     pwm_set_both_levels(dac_pwm_a3_slice_num, next_sample, next_sample);
@@ -458,44 +484,49 @@ static void alarm_func(uint alarm_num)
     if (s < (-QUANTIZATION_MAX)) s = -QUANTIZATION_MAX;
     if (s > (QUANTIZATION_MAX-1)) s = QUANTIZATION_MAX-1;
     next_sample = (s + QUANTIZATION_MAX) / ((QUANTIZATION_MAX*2) / DAC_PWM_WRAP_VALUE);
+#endif
+
     last_time = delayed_by_us(last_time, 40);
     do
     {
         next_alarm_time = update_next_timeout(last_time, 0, 8);
     } while (hardware_alarm_set_target(claimed_alarm_num, next_alarm_time));
-    counter++;
 }
 
-void reset_periodic_alarm(uint16_t *reset_samples)
+void reset_control_samples_core(uint16_t *reset_samples)
+{
+    bool lockedout = multicore_lockout_victim_is_initialized(1);
+    if (lockedout) multicore_lockout_start_blocking();
+    reset_control_samples(reset_samples);
+    if (lockedout) multicore_lockout_end_blocking();
+}
+
+void reset_periodic_alarm(void)
 {
     if (claimed_alarm_num == UNCLAIMED_ALARM) return;
     
     hardware_alarm_cancel(claimed_alarm_num);
-    control_sample_no = 0;
-    current_input = 0;
-    reset_control_samples(reset_samples);
     hardware_alarm_set_callback(claimed_alarm_num, alarm_func);
     last_time = make_timeout_time_us(1000);
     absolute_time_t next_alarm_time = update_next_timeout(last_time, 0, 8);
-    //absolute_time_t next_alarm_time = make_timeout_time_us(1000);
     hardware_alarm_set_target(claimed_alarm_num, next_alarm_time);
 }
 
 void reset_load_controls(void)
 {
     update_control_values();
-    reset_periodic_alarm(samples);
+    reset_control_samples_core(samples);
 }
 
-void initialize_periodic_alarm(uint16_t *reset_samples)
+void initialize_periodic_alarm(void)
 {
     if (claimed_alarm_num != UNCLAIMED_ALARM)
     {
-        reset_periodic_alarm(reset_samples);
+        reset_periodic_alarm();
         return;
     }
     claimed_alarm_num = hardware_alarm_claim_unused(true);
-    reset_periodic_alarm(reset_samples);
+    reset_periodic_alarm();
 }
 
 void initialize_adc(void)
@@ -603,27 +634,35 @@ void adjust_dsp_parms_unit(uint8_t unit_no)
                     {
                         dsp_unit_initialize(unit_no, (dsp_unit_type)mst.item);
                         dsp_unit_reset_all();
+                        update_control_values();
                     }
                 }
             } else
             {
+                uint8_t control = d[sel-1].controldesc != NULL;
                 scroll_number_dat snd = { 0, 3, 
                                           d[sel-1].digits,
                                           0,
                                           d[sel-1].minval,
                                           d[sel-1].maxval,
-                                          0,
+                                          control,
                                           0,
                                           dsp_read_value_prec((void *)(((uint8_t *)&dsp_parms[unit_no]) + d[sel-1].offset), d[sel-1].size),
                                           0, 0 };
                 scroll_number_start(&snd);
+                if (control) pause_poll_keyboard = true;
                 do
                 {
                     idle_task();
                     scroll_number_key(&snd);
                 } while (!snd.entered);
+                pause_poll_keyboard = false;
+                buttons_clear();
                 if (snd.changed)
+                {
                    dsp_set_value_prec((void *)(((uint8_t *)&dsp_parms[unit_no]) + d[sel-1].offset), d[sel-1].size, snd.n);
+                   update_control_values();
+                }
             }
             redraw = 1;
         }
@@ -873,7 +912,7 @@ int write_data_to_flash(uint32_t flash_offset, const uint8_t *data, uint core, u
     flash_range_program(flash_offset, data, length);
     restore_interrupts(ints);
     if (multicore) multicore_lockout_end_blocking();
-    reset_periodic_alarm(NULL);
+    reset_periodic_alarm();
     return 0;
 }
 
@@ -1386,6 +1425,32 @@ void update_control_values(void)
         }
         unit_no++;
     }
+    unit_no = 0;
+    for (;;)
+    {
+        dsp_unit_type dut = dsp_unit_get_type(unit_no);
+        if (dut >= DSP_TYPE_MAX_ENTRY) break;
+        entry_no = 0;
+        for (;;)
+        {
+          const dsp_parm_configuration_entry *dpce = dsp_unit_get_configuration_entry(unit_no, entry_no);
+          if (dpce == NULL) break;
+          if (dpce->controldesc != NULL)
+          {
+            if (dsp_unit_get_value(unit_no, dpce->desc, &value))
+            {
+                if ((value >= 1) && (value <= ((sizeof(potentiometer_mapping)/sizeof(potentiometer_mapping[0])))))
+                {
+                   char s[CONTROL_VALUE_LENGTH+1];
+                   snprintf(s, CONTROL_VALUE_LENGTH, "%02d %s", unit_no+1, dpce->controldesc);
+                   memcpy(control_value[value], s, CONTROL_VALUE_LENGTH);
+                }
+            }
+          }
+          entry_no++;
+        }
+        unit_no++;
+    }
 }
 
 int sconf_cmd(int args, tinycl_parameter* tp, void *v)
@@ -1671,6 +1736,31 @@ void configuration(void)
   }
 }
 
+#ifdef PLACE_IN_RAM
+static void __no_inline_not_in_flash_func(synth_task)(void)
+#else
+static void synth_task(void)
+#endif
+{
+    multicore_lockout_victim_init();
+    for (;;)
+    {
+        while (waiting_for_sample) {};
+
+        int32_t s = synth_process_all_units();
+        if (s < (-QUANTIZATION_MAX)) s = -QUANTIZATION_MAX;
+        if (s > (QUANTIZATION_MAX-1)) s = QUANTIZATION_MAX-1;
+        next_sample = (s + QUANTIZATION_MAX) / ((QUANTIZATION_MAX*2) / DAC_PWM_WRAP_VALUE);
+        waiting_for_sample = true;
+    }
+}
+
+void start_synth_engine(void)
+{
+    multicore_reset_core1();
+    multicore_launch_core1(synth_task);
+}
+
 int main()
 {
     sleep_us(250000u);
@@ -1685,8 +1775,9 @@ int main()
     initialize_pwm();
     ssd1306_Initialize();
     initialize_adc();
-    initialize_periodic_alarm(NULL);
+    initialize_periodic_alarm();
     flash_load_most_recent();
+    start_synth_engine();
     
     //test_analog_controls();
     //test_analog_controls_sticky();

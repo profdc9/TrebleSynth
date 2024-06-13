@@ -737,6 +737,7 @@ typedef struct
     uint8_t    digits;
     uint32_t   minval;
     uint32_t   maxval;
+    const char *controldesc;
 } dsp_parm_configuration_entry;
 
 bool dsp_unit_set_value(uint dsp_unit_number, const char *desc, uint32_t value);

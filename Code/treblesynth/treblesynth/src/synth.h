@@ -78,6 +78,7 @@ typedef struct
     int32_t  harmonic;
     uint32_t control_amplitude;
     uint32_t control_control_gain;
+    uint32_t phase;
 } synth_parm_vco;
 
 typedef struct

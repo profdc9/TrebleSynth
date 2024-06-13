@@ -137,6 +137,7 @@ void synth_note_start_vco(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t
     su->stvco.counter_semitone_control_gain = (counter_inc_float * SEMITONE_LOG_STEP) * sp->stvco.control_gain;
     su->stvco.wave = wavetables[sp->stvco.osc_type-1];
     su->stvco.control_ptr = &synth_unit_result[note][sp->stvco.control_unit-1];
+    su->stvco.counter = sp->stvco.phase;
 }
 
 const synth_parm_configuration_entry synth_parm_configuration_entry_vco[] = 
@@ -147,8 +148,9 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_vco[] =
     { "ControlGain", offsetof(synth_parm_vco,control_gain),          4, 2, 0, 63, NULL },
     { "Amplitude",   offsetof(synth_parm_vco,amplitude),             4, 3, 0, 256, NULL },        
     { "Harmonic",    offsetof(synth_parm_vco,harmonic),              4, 1, 1, sizeof(harmonic_addition)/sizeof(int32_t), NULL },        
-    { "AmplCtrl",    offsetof(synth_parm_vco,control_amplitude),     4, 2, 0, POTENTIOMETER_MAX, "Amplitude" },
-    { "GainCtrl",    offsetof(synth_parm_vco,control_control_gain),  4, 2, 0, POTENTIOMETER_MAX, "CtrlGain" },
+    { "Phase",       offsetof(synth_parm_vco,phase),                 4, 4, (WAVETABLES_LENGTH-1), NULL },
+    { "AmplCtrl",    offsetof(synth_parm_vco,control_amplitude),     4, 2, 0, POTENTIOMETER_MAX, "VCOAmpli" },
+    { "GainCtrl",    offsetof(synth_parm_vco,control_control_gain),  4, 2, 0, POTENTIOMETER_MAX, "VCOGain" },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
@@ -270,9 +272,9 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_lowpass[] =
 {
     { "SourceUnit",  offsetof(synth_parm_lowpass,source_unit),        4, 2, 1, MAX_SYNTH_UNITS, NULL },
     { "ControlUnit", offsetof(synth_parm_lowpass,control_unit),       4, 2, 1, MAX_SYNTH_UNITS, NULL },
-    { "KneeFreq",    offsetof(synth_parm_lowpass,kneefreq),           2, 3, 0, 255, NULL },
+    { "LPFreq",      offsetof(synth_parm_lowpass,kneefreq),           2, 3, 0, 255, NULL },
     { "Stages",      offsetof(synth_parm_lowpass,stages),             4, 1, 0, 4, NULL },
-    { "KneeCtrl",    offsetof(synth_parm_lowpass,control_kneefreq),   4, 2, 0, POTENTIOMETER_MAX, "Kneefreq" },
+    { "LPFreqCtrl",  offsetof(synth_parm_lowpass,control_kneefreq),   4, 2, 0, POTENTIOMETER_MAX, "LPFreq" },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
@@ -331,9 +333,9 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_osc[] =
     { "OscType",     offsetof(synth_parm_osc,osc_type),           4, 1, 1, 8, NULL },
     { "ControlGain", offsetof(synth_parm_osc,control_gain),       4, 2, 0, 15, NULL },
     { "BendGain",    offsetof(synth_parm_osc,bend_gain),          4, 2, 0, 15, NULL },
-    { "BendCtrl",    offsetof(synth_parm_osc,control_bend),       4, 2, 0, POTENTIOMETER_MAX, "BendGain" },
-    { "FreqCtrl",    offsetof(synth_parm_osc,control_frequency),  4, 2, 0, POTENTIOMETER_MAX, "Frequency" },
-    { "AmplCtrl",    offsetof(synth_parm_osc,control_amplitude),  4, 2, 0, POTENTIOMETER_MAX, "Amplitude" },
+    { "BendCtrl",    offsetof(synth_parm_osc,control_bend),       4, 2, 0, POTENTIOMETER_MAX, "LFOFMGain" },
+    { "FreqCtrl",    offsetof(synth_parm_osc,control_frequency),  4, 2, 0, POTENTIOMETER_MAX, "LFOFreq" },
+    { "AmplCtrl",    offsetof(synth_parm_osc,control_amplitude),  4, 2, 0, POTENTIOMETER_MAX, "LFOAmpli" },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
@@ -369,7 +371,7 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_vca[] =
     { "ControlUnit", offsetof(synth_parm_vca,control_unit),       4, 2, 1, MAX_SYNTH_UNITS, NULL },
     { "ControlGain", offsetof(synth_parm_vca,control_gain),       4, 3, 0, 256, NULL },
     { "Amplitude",   offsetof(synth_parm_vca,amplitude),          4, 3, 0, 256, NULL },        
-    { "AmplCtrl",    offsetof(synth_parm_vca,control_amplitude),  4, 2, 0, POTENTIOMETER_MAX, "Amplitude" },
+    { "AmplCtrl",    offsetof(synth_parm_vca,control_amplitude),  4, 2, 0, POTENTIOMETER_MAX, "VCAAmpli" },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
@@ -406,8 +408,8 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_mixer[] =
     { "Source2Unit",  offsetof(synth_parm_mixer,source2_unit) ,      4, 2, 1, MAX_SYNTH_UNITS, NULL },
     { "Mixval",       offsetof(synth_parm_mixer,mixval),             4, 3, 0, 256, NULL },        
     { "Amplitude",    offsetof(synth_parm_mixer,amplitude),          4, 3, 0, 256, NULL },        
-    { "MixCtrl",      offsetof(synth_parm_mixer,control_mixval),     4, 2, 0, POTENTIOMETER_MAX, "Mixer" },
-    { "AmplCtrl",     offsetof(synth_parm_mixer,control_amplitude),  4, 2, 0, POTENTIOMETER_MAX, "Amplitude" },
+    { "MixCtrl",      offsetof(synth_parm_mixer,control_mixval),     4, 2, 0, POTENTIOMETER_MAX, "MixerBal" },
+    { "AmplCtrl",     offsetof(synth_parm_mixer,control_amplitude),  4, 2, 0, POTENTIOMETER_MAX, "MixerAmpli" },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
@@ -439,7 +441,7 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_ring[] =
     { "SourceUnit",  offsetof(synth_parm_ring,source_unit),        4, 2, 1, MAX_SYNTH_UNITS, NULL },
     { "ControlUnit", offsetof(synth_parm_ring,control_unit),       4, 2, 1, MAX_SYNTH_UNITS, NULL },
     { "Amplitude",   offsetof(synth_parm_ring,amplitude),          4, 3, 0, 256, NULL },        
-    { "AmplCtrl",    offsetof(synth_parm_ring,control_amplitude),  4, 2, 0, POTENTIOMETER_MAX, "Amplitude" },
+    { "AmplCtrl",    offsetof(synth_parm_ring,control_amplitude),  4, 2, 0, POTENTIOMETER_MAX, "RingAmpli" },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
@@ -453,7 +455,7 @@ const char * const stnames[] =
     "VCO",
     "ADSR",
     "Lowpass",
-    "Osc",
+    "LFO",
     "VCA",
     "Mixer",
     "Ring",
