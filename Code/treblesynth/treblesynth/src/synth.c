@@ -36,15 +36,14 @@
 #define QUANTIZATION_MAX (1<<QUANTIZATION_BITS)
 #define QUANTIZATION_MAX_FLOAT ((float)(1<<QUANTIZATION_BITS))
 
-uint32_t synth_note_frequency_table_counter[MIDI_NOTES];
-float synth_note_frequency_table[MIDI_NOTES];
-
 volatile uint32_t synth_note_active[MAX_POLYPHONY];
 volatile uint32_t synth_note_stopping[MAX_POLYPHONY];
 volatile uint32_t synth_note_stopping_fast[MAX_POLYPHONY];
 uint8_t synth_note_number[MAX_POLYPHONY];
 uint8_t synth_note_velocity[MAX_POLYPHONY];
 uint32_t synth_note_stopping_counter[MAX_POLYPHONY];
+uint32_t synth_note_count[MAX_POLYPHONY];
+uint32_t synth_current_note_count;
 
 synth_unit synth_units[MAX_POLYPHONY][MAX_SYNTH_UNITS];
 synth_parm synth_parms[MAX_SYNTH_UNITS];
@@ -71,15 +70,6 @@ inline float frequency_semitone_fraction_from_vco(uint32_t vco)
 inline float counter_fraction_from_vco(uint32_t vco)
 {
     return expf((SEMITONE_LOG_STEP*((float)MIDI_NOTES)/((float)QUANTIZATION_MAX))*((float)vco))*((MIDI_FREQUENCY_0/((float)DSP_SAMPLERATE))*((((float)SYNTH_OSCILLATOR_PRECISION)*WAVETABLES_LENGTH)));
-}
-
-void synth_note_frequency_table_initialize(void)
-{
-    for (int note_no=0;note_no<MIDI_NOTES;note_no++)
-    {
-        synth_note_frequency_table[note_no] = expf(SEMITONE_LOG_STEP*note_no)*(MIDI_FREQUENCY_0/DSP_SAMPLERATE);
-        synth_note_frequency_table_counter[note_no] =  synth_note_frequency_table[note_no]*(((float)SYNTH_OSCILLATOR_PRECISION)*SINE_TABLE_ENTRIES);
-    }
 }
 
 /**************************** SYNTH_TYPE_NONE **************************************************/
@@ -608,46 +598,67 @@ static inline int32_t synth_process(synth_parm *sp, synth_unit *su, int note)
     return stp[(int)sp->stn.sut](sp, su, note);
 }
 
-void synth_start_note(uint8_t note_no, uint8_t velocity)
+void synth_start_note_val(uint8_t note_no, uint8_t velocity, int note)
 {
     uint32_t vco = ((uint32_t)note_no)*(QUANTIZATION_MAX/MIDI_NOTES);
+    for (int unit_no=0;unit_no<MAX_SYNTH_UNITS;unit_no++)
+    {
+        synth_unit *su = synth_unit_entry(note, unit_no);
+        synth_parm *sp = synth_parm_entry(unit_no);
+        memset(su,'\000',sizeof(synth_unit));
+        sns[(int)sp->stn.sut](sp, su, vco, velocity, note);
+    }
+    synth_note_number[note] = note_no;
+    synth_note_velocity[note] = velocity;
+    synth_note_stopping[note] = false;
+    synth_note_stopping_fast[note] = false;
+    synth_note_stopping_counter[note] = 0;
+    synth_note_count[note] = ++synth_current_note_count;
+    DMB();
+    mutex_enter_blocking(&note_mutexes[note]);
+    synth_note_active[note] = true;
+    DMB();
+    mutex_exit(&note_mutexes[note]);
+}
+
+void synth_stop_note_now(int note)
+{
+    mutex_enter_blocking(&note_mutexes[note]);
+    synth_note_stopping_counter[note] = SYNTH_STOPPING_COUNTER;
+    DMB();
+    synth_note_stopping_fast[note] = true;
+    DMB();
+    mutex_exit(&note_mutexes[note]);
+    while (synth_note_active[note]) {};
+}
+
+void synth_start_note(uint8_t note_no, uint8_t velocity)
+{
     for (int note=0;note<MAX_POLYPHONY;note++)
     {
         if ((synth_note_active[note]) && (synth_note_number[note] == note_no))
-        {
-            mutex_enter_blocking(&note_mutexes[note]);
-            synth_note_stopping_counter[note] = SYNTH_STOPPING_COUNTER;
-            DMB();
-            synth_note_stopping_fast[note] = true;
-            DMB();
-            mutex_exit(&note_mutexes[note]);
-            while (synth_note_active[note]) {};
-        }
+            synth_stop_note_now(note);
     }
     for (int note=0;note<MAX_POLYPHONY;note++)
     {
         if (!synth_note_active[note])
         {
-            for (int unit_no=0;unit_no<MAX_SYNTH_UNITS;unit_no++)
-            {
-                synth_unit *su = synth_unit_entry(note, unit_no);
-                synth_parm *sp = synth_parm_entry(unit_no);
-                memset(su,'\000',sizeof(synth_unit));
-                sns[(int)sp->stn.sut](sp, su, vco, velocity, note);
-            }
-            synth_note_number[note] = note_no;
-            synth_note_velocity[note] = velocity;
-            synth_note_stopping[note] = false;
-            synth_note_stopping_fast[note] = false;
-            synth_note_stopping_counter[note] = 0;
-            DMB();
-            mutex_enter_blocking(&note_mutexes[note]);
-            synth_note_active[note] = true;
-            DMB();
-            mutex_exit(&note_mutexes[note]);
+            synth_start_note_val(note_no, velocity, note);
             return;
         }
     }
+    int oldest_note = 0;
+    uint32_t oldest_note_count = synth_note_count[0];
+    for (int note=1;note<MAX_POLYPHONY;note++)
+    {
+        if (synth_note_count[note] < oldest_note_count)
+        {
+            oldest_note_count = synth_note_count[note];
+            oldest_note = note;
+        }
+    }
+    synth_stop_note_now(oldest_note);
+    synth_start_note_val(note_no, velocity, oldest_note);
 }
 
 void synth_stop_note(uint8_t note_no, uint8_t velocity)
@@ -681,8 +692,8 @@ void synth_panic(void)
 
 void synth_initialize(void)
 {
-    synth_note_frequency_table_initialize();
     mutex_init(&synth_mutex);
+    synth_current_note_count = 0;
     for (int note=0;note<MAX_POLYPHONY;note++)
     {
         synth_note_active[note] = false;
@@ -691,6 +702,7 @@ void synth_initialize(void)
         synth_note_stopping_counter[note] = 0;
         synth_note_number[note] = 0;
         synth_note_velocity[note] = 0;
+        synth_note_count[note] = 0;
         mutex_init(&note_mutexes[note]);
     }
     for (int unit_number=0;unit_number<MAX_SYNTH_UNITS;unit_number++) 
@@ -710,17 +722,13 @@ int32_t synth_local_process_all_units(void)
         {
             int32_t *sur = synth_unit_result[note];
             sur[0] = 0;
+            synth_parm *sp = synth_parms;
+            synth_unit *su = synth_units[note];
             for (int unit_no=0;unit_no<MAX_SYNTH_UNITS;unit_no++)
             {
-                synth_parm *sp = synth_parm_entry(unit_no);
-                if (sp->stn.sut == 0)
-                {
-                    sur[unit_no+1] = sur[sp->stn.source_unit-1];
-                } else
-                {
-                    synth_unit *su = synth_unit_entry(note, unit_no);
-                    sur[unit_no+1] = synth_process(sp, su, note);
-                }
+                sur[unit_no+1] = (sp->stn.sut == 0) ? sur[sp->stn.source_unit-1] : synth_process(sp, su, note);
+                sp++;
+                su++;
             }
             int32_t sample = sur[MAX_SYNTH_UNITS];
             if (synth_note_stopping_fast[note])
