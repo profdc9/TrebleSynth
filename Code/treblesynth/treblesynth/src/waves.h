@@ -36,6 +36,8 @@ extern "C" {
 
 extern const int16_t *wavetables[WAVETABLES_NUMBER];
 
+extern const int16_t table_sine[];
+ 
 #ifdef __cplusplus
 }
 #endif

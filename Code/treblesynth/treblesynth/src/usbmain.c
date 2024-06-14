@@ -135,6 +135,11 @@ bool midi_perform_event(const uint8_t cmdbuf[], int num)
                         synth_stop_note(cmdbuf[1],cmdbuf[2]);
                         ex = true;
                         break;
+            case 0xE0:  {
+                           uint32_t pitch_bend = ((int32_t)(cmdbuf[1] & 0x7F)) + (((int32_t)(cmdbuf[2] & 0x7F)) * 128);
+                           synth_set_pitch_bend_value(pitch_bend);
+                        }
+                        break;
        }
    }
    return ex;

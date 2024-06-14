@@ -44,6 +44,7 @@ uint8_t synth_note_velocity[MAX_POLYPHONY];
 uint32_t synth_note_stopping_counter[MAX_POLYPHONY];
 uint32_t synth_note_count[MAX_POLYPHONY];
 uint32_t synth_current_note_count;
+int32_t synth_pitch_bend_value;
 
 synth_unit synth_units[MAX_POLYPHONY][MAX_SYNTH_UNITS];
 synth_parm synth_parms[MAX_SYNTH_UNITS];
@@ -105,7 +106,8 @@ static int32_t __no_inline_not_in_flash_func(synth_type_process_vco)(synth_parm 
 int32_t synth_type_process_vco(synth_parm *sp, synth_unit *su, int note)
 #endif
 {
-    su->stvco.counter += (su->stvco.counter_inc + (su->stvco.counter_semitone_control_gain*( (*su->stvco.control_ptr) /64))/(QUANTIZATION_MAX/64) );
+    su->stvco.counter += (su->stvco.counter_inc + ((su->stvco.counter_semitone_control_gain*(*su->stvco.control_ptr / 64) + 
+                                                    su->stvco.counter_semitone_pitch_bend_gain * (synth_pitch_bend_value /64))/(QUANTIZATION_MAX/64)));
     int32_t sample = su->stvco.wave[(su->stvco.counter / SYNTH_OSCILLATOR_PRECISION) & (WAVETABLES_LENGTH-1)];
     sample = (sample * ((int32_t)sp->stvco.amplitude)) / 256;
     return sample;
@@ -134,10 +136,11 @@ void synth_note_start_vco(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t
     }
     float counter_inc_float = counter_fraction_from_vco(vco);
     su->stvco.counter_inc = counter_inc_float;
-    su->stvco.counter_semitone_control_gain = (counter_inc_float * SEMITONE_LOG_STEP) * sp->stvco.control_gain;
+    float f = counter_inc_float * SEMITONE_LOG_STEP;
+    su->stvco.counter_semitone_control_gain = f * sp->stvco.control_gain;
+    su->stvco.counter_semitone_pitch_bend_gain = f * sp->stvco.pitch_bend_gain;
     su->stvco.wave = wavetables[sp->stvco.osc_type-1];
     su->stvco.control_ptr = &synth_unit_result[note][sp->stvco.control_unit-1];
-    su->stvco.counter = sp->stvco.phase;
 }
 
 const synth_parm_configuration_entry synth_parm_configuration_entry_vco[] = 
@@ -145,10 +148,10 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_vco[] =
     { "SourceUnit",  offsetof(synth_parm_vco,source_unit),           4, 2, 1, MAX_SYNTH_UNITS, NULL },
     { "ControlUnit", offsetof(synth_parm_vco,control_unit),          4, 2, 1, MAX_SYNTH_UNITS, NULL },
     { "OscType",     offsetof(synth_parm_vco,osc_type),              4, 1, 1, WAVETABLES_NUMBER, NULL },
-    { "ControlGain", offsetof(synth_parm_vco,control_gain),          4, 2, 0, 63, NULL },
     { "Amplitude",   offsetof(synth_parm_vco,amplitude),             4, 3, 0, 256, NULL },        
     { "Harmonic",    offsetof(synth_parm_vco,harmonic),              4, 1, 1, sizeof(harmonic_addition)/sizeof(int32_t), NULL },        
-    { "Phase",       offsetof(synth_parm_vco,phase),                 4, 4, (WAVETABLES_LENGTH-1), NULL },
+    { "ControlGain", offsetof(synth_parm_vco,control_gain),          4, 2, 0, 63, NULL },
+    { "BendGain",    offsetof(synth_parm_vco,pitch_bend_gain),       4, 2, 0, 63, NULL },
     { "AmplCtrl",    offsetof(synth_parm_vco,control_amplitude),     4, 2, 0, POTENTIOMETER_MAX, "VCOAmpli" },
     { "GainCtrl",    offsetof(synth_parm_vco,control_control_gain),  4, 2, 0, POTENTIOMETER_MAX, "VCOGain" },
     { NULL, 0, 4, 0, 0,   1, NULL    }
@@ -339,7 +342,7 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_osc[] =
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
-const synth_parm_osc synth_parm_osc_default = { 0, 0, 0, 1, 1, 262, 256, 0, 1, 0, 0 };
+const synth_parm_osc synth_parm_osc_default = { 0, 0, 0, 1, 1, 6, 256, 0, 1, 0, 0 };
 
 /**************************** SYNTH_TYPE_VCA **************************************************/
 
@@ -696,6 +699,7 @@ void synth_initialize(void)
 {
     mutex_init(&synth_mutex);
     synth_current_note_count = 0;
+    synth_pitch_bend_value = 0;
     for (int note=0;note<MAX_POLYPHONY;note++)
     {
         synth_note_active[note] = false;
@@ -822,4 +826,9 @@ bool synth_unit_get_value(uint synth_unit_number, const char *desc, uint32_t *va
         spce_l++;
     }
     return false;
+}
+
+void synth_set_pitch_bend_value(uint32_t pitch_bend_value)
+{
+    synth_pitch_bend_value = ((int32_t)pitch_bend_value)*((QUANTIZATION_MAX*2)/16384)-QUANTIZATION_MAX;
 }

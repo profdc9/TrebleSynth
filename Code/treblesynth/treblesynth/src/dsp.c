@@ -30,8 +30,7 @@
 #include <math.h>
 #include "dsp.h"
 #include "treblesynth.h"
-
-int32_t sine_table[SINE_TABLE_ENTRIES];
+#include "Waves.h"
 
 int sample_circ_buf_offset;
 int16_t sample_circ_buf[SAMPLE_CIRC_BUF_SIZE];
@@ -42,12 +41,10 @@ dsp_unit dsp_units[MAX_DSP_UNITS];
 dsp_parm dsp_parms[MAX_DSP_UNITS];
 int32_t dsp_unit_result[MAX_DSP_UNITS+1];
 
-void initialize_sine_table(void)
+inline int32_t sine_wave_table(uint n)
 {
-    for (int i=0;i<SINE_TABLE_ENTRIES;i++)
-        sine_table[i] =  (int32_t)(QUANTIZATION_MAX_FLOAT * sinf((2.0f*MATH_PI_F/((float)SINE_TABLE_ENTRIES))*((float)i)));
-}
-
+    return table_sine[n & (WAVETABLES_LENGTH-1)];
+};
 void initialize_sample_circ_buf(void)
 {
     memset((void *)sample_circ_buf, '\000', sizeof(sample_circ_buf));
@@ -114,7 +111,7 @@ int32_t dsp_type_process_sin_synth(int32_t sample, dsp_parm *dp, dsp_unit *du)
         if (dp->dtss.amplitude[i] != 0) 
         {
             du->dtss.sine_counter[i] += du->dtss.sine_counter_inc[i];
-            int32_t val = sine_table_entry((du->dtss.sine_counter[i] & 0xFFFF) / 256) / (QUANTIZATION_MAX / (ADC_PREC_VALUE/2));
+            int32_t val = sine_wave_table((du->dtss.sine_counter[i] & 0xFFFF) / (65536/WAVETABLES_LENGTH)) / (QUANTIZATION_MAX / (ADC_PREC_VALUE/2));
             sine_val += val * ((int32_t)dp->dtss.amplitude[i]);
             ct++;
         }
@@ -507,7 +504,7 @@ int32_t dsp_type_process_tremolo(int32_t sample, dsp_parm *dp, dsp_unit *du)
         du->dttrem.sine_counter_inc = (du->dttrem.last_frequency*65536) / DSP_SAMPLERATE;
     }
     du->dttrem.sine_counter += du->dttrem.sine_counter_inc;
-    int32_t sine_val = sine_table_entry((du->dttrem.sine_counter & 0xFFFF) / 256);
+    int32_t sine_val = sine_wave_table((du->dttrem.sine_counter & 0xFFFF) / (65536/WAVETABLES_LENGTH));
     int32_t mod_val = ((sine_val * dp->dttrem.modulation) + QUANTIZATION_MAX * 256) / 512;
     sample = (sample * mod_val) / QUANTIZATION_MAX;
     return sample;
@@ -547,7 +544,7 @@ int32_t dsp_type_process_vibrato(int32_t sample, dsp_parm *dp, dsp_unit *du)
         du->dtvibr.sine_counter_inc = (du->dtvibr.last_frequency*65536) / DSP_SAMPLERATE;
     }
     du->dtvibr.sine_counter += du->dtvibr.sine_counter_inc;
-    int32_t sine_val = sine_table_entry((du->dtvibr.sine_counter & 0xFFFF) / 256);
+    int32_t sine_val = sine_wave_table((du->dtvibr.sine_counter & 0xFFFF) / (65536 / WAVETABLES_LENGTH));
     int32_t mod_val = ((sine_val * dp->dtvibr.modulation) + QUANTIZATION_MAX * 256) / 512;
     uint32_t delay_samples = (dp->dtvibr.delay_samples * mod_val) / QUANTIZATION_MAX;
     sample = sample_circ_buf_clean_value(delay_samples);
@@ -596,7 +593,7 @@ int32_t dsp_type_process_wah(int32_t sample, dsp_parm *dp, dsp_unit *du)
     if (abs(new_input - du->dtwah.pot_value1) >= POTENTIOMETER_VALUE_SENSITIVITY)
     {
         du->dtwah.pot_value1 = new_input;
-        int32_t sine_val = sine_table_entry(new_input / (POT_MAX_VALUE / (SINE_TABLE_ENTRIES / 4)));
+        int32_t sine_val = sine_wave_table(new_input / (POT_MAX_VALUE / (WAVETABLES_LENGTH / 4)));
         du->dtwah.filta1 = du->dtwah.filta1_interp1 + ((du->dtwah.filta1_interp2 - du->dtwah.filta1_interp1) * 
                             (dp->dtwah.reverse ? sine_val : (QUANTIZATION_MAX - 1) - sine_val) / QUANTIZATION_MAX);
     }
@@ -662,7 +659,7 @@ int32_t dsp_type_process_autowah(int32_t sample, dsp_parm *dp, dsp_unit *du)
     }
 
     du->dtautowah.sine_counter += du->dtautowah.sine_counter_inc;
-    int32_t sine_val = (QUANTIZATION_MAX - 1) - abs(sine_table_entry((du->dtautowah.sine_counter & 0xFFFF0) / 4096));
+    int32_t sine_val = (QUANTIZATION_MAX - 1) - abs(sine_wave_table((du->dtautowah.sine_counter & 0xFFFF0) / (0xFFFF0 / WAVETABLES_LENGTH)));
     
     du->dtautowah.filta1 = du->dtautowah.filta1_interp1 + ((du->dtautowah.filta1_interp2 - du->dtautowah.filta1_interp1) * 
                             sine_val) / QUANTIZATION_MAX;
@@ -736,19 +733,19 @@ int32_t dsp_type_process_envelope(int32_t sample, dsp_parm *dp, dsp_unit *du)
     switch (dp->dtenv.sensitivity)
     {
         case 1:  if (envfilt > (ADC_PREC_VALUE/16-1)) envfilt = ADC_PREC_VALUE/16-1;    
-                 envfilt =  ((envfilt * (SINE_TABLE_ENTRIES/4) ) / (ADC_PREC_VALUE/16));
+                 envfilt =  ((envfilt * (WAVETABLES_LENGTH/4) ) / (ADC_PREC_VALUE/16));
                  break;
         case 2:  if (envfilt > (ADC_PREC_VALUE/8-1)) envfilt = ADC_PREC_VALUE/8-1;    
-                 envfilt =  ((envfilt * (SINE_TABLE_ENTRIES/4) ) / (ADC_PREC_VALUE/8));
+                 envfilt =  ((envfilt * (WAVETABLES_LENGTH/4) ) / (ADC_PREC_VALUE/8));
                  break;
         case 3:  if (envfilt > (ADC_PREC_VALUE/4-1)) envfilt = ADC_PREC_VALUE/4-1;    
-                 envfilt =  ((envfilt * (SINE_TABLE_ENTRIES/4) ) / (ADC_PREC_VALUE/4));
+                 envfilt =  ((envfilt * (WAVETABLES_LENGTH/4) ) / (ADC_PREC_VALUE/4));
                  break;
         case 4:  if (envfilt > (ADC_PREC_VALUE/2-1)) envfilt = ADC_PREC_VALUE/2-1;    
-                 envfilt =  ((envfilt * (SINE_TABLE_ENTRIES/4) ) / (ADC_PREC_VALUE/2));
+                 envfilt =  ((envfilt * (WAVETABLES_LENGTH/4) ) / (ADC_PREC_VALUE/2));
                  break;
     }           
-    int32_t sin_val = (QUANTIZATION_MAX - 1) - sine_table_entry(envfilt  + (dp->dtenv.reverse ? 0 : (SINE_TABLE_ENTRIES/4)));
+    int32_t sin_val = (QUANTIZATION_MAX - 1) - sine_wave_table(envfilt  + (dp->dtenv.reverse ? 0 : (WAVETABLES_LENGTH/4)));
     du->dtenv.filta1 = du->dtenv.filta1_interp1 + ((du->dtenv.filta1_interp2 - du->dtenv.filta1_interp1) * 
                             sin_val) / QUANTIZATION_MAX;
  
@@ -936,7 +933,7 @@ int32_t dsp_type_process_ring(int32_t sample, dsp_parm *dp, dsp_unit *du)
     }
 
     du->dtring.sine_counter += du->dtring.sine_counter_inc;
-    int32_t sine_val = sine_table_entry((du->dtring.sine_counter & 0xFFFF00) / 4096);
+    int32_t sine_val = sine_wave_table((du->dtring.sine_counter & 0xFFFF00) / (0xFFFF0 / WAVETABLES_LENGTH));
     if (!dp->dtring.sine_mix)
     {
         sine_val *= 4;
@@ -981,7 +978,7 @@ int32_t dsp_type_process_flange(int32_t sample, dsp_parm *dp, dsp_unit *du)
         du->dtflng.sine_counter_inc = du->dtflng.last_frequency; // (du->dtflng.frequency * 65536) / DSP_SAMPLERATE;
     }
     du->dtflng.sine_counter += du->dtflng.sine_counter_inc;
-    int32_t sine_val = sine_table_entry((du->dtflng.sine_counter & 0xFFFF00) / 4096);
+    int32_t sine_val = sine_wave_table((du->dtflng.sine_counter & 0xFFFF00) / (0xFFFF0 / WAVETABLES_LENGTH));
     int32_t mod_val = ((sine_val * dp->dtflng.modulation) + QUANTIZATION_MAX * 256) / 512;
     uint32_t delay_samples = (dp->dtflng.delay_samples * mod_val) / QUANTIZATION_MAX;
     sample = (sample_circ_buf_value(delay_samples) * ((int32_t)dp->dtflng.feedback) + sample * ((int32_t)(255 - dp->dtflng.feedback))) / 256;
@@ -1025,7 +1022,7 @@ int32_t dsp_type_process_chorus(int32_t sample, dsp_parm *dp, dsp_unit *du)
         du->dtchor.sine_counter_inc = du->dtchor.last_frequency; // (du->dtchor.frequency * 65536) / DSP_SAMPLERATE;
     }
     du->dtchor.sine_counter += du->dtchor.sine_counter_inc;
-    int32_t sine_val = sine_table_entry((du->dtchor.sine_counter & 0xFFFF00) / 4096);
+    int32_t sine_val = sine_wave_table((du->dtchor.sine_counter & 0xFFFF00) / (0xFFFF0 / WAVETABLES_LENGTH));
     int32_t mod_val = ((sine_val * dp->dtchor.modulation) + QUANTIZATION_MAX * 256) / 512;
     uint32_t delay_samples = (dp->dtchor.delay_samples * mod_val) / QUANTIZATION_MAX;
     sample = (sample_circ_buf_clean_value(delay_samples) * ((int32_t)dp->dtchor.mixval) + sample * ((int32_t)(255 - dp->dtchor.mixval))) / 256;
@@ -1083,7 +1080,7 @@ int32_t dsp_type_process_phaser(int32_t sample, dsp_parm *dp, dsp_unit *du)
     }
     
     du->dtphaser.sine_counter += du->dtphaser.sine_counter_inc;
-    int32_t sine_val = QUANTIZATION_MAX - 1 - abs(sine_table_entry((du->dtphaser.sine_counter & 0xFFFF0) / 4096));
+    int32_t sine_val = QUANTIZATION_MAX - 1 - abs(sine_wave_table((du->dtphaser.sine_counter & 0xFFFF0) / (0xFFFF0 / WAVETABLES_LENGTH)));
     du->dtphaser.filta1 = du->dtphaser.filta1_interp1 + ((du->dtphaser.filta1_interp2 - du->dtphaser.filta1_interp1) * 
                             sine_val) / QUANTIZATION_MAX;
 
@@ -1556,7 +1553,6 @@ static inline int32_t dsp_process(int32_t sample, dsp_parm *dp, dsp_unit *du)
 
 void initialize_dsp(void)
 {
-    initialize_sine_table();
     initialize_sample_circ_buf();
     for (int unit_number=0;unit_number<MAX_DSP_UNITS;unit_number++) 
         dsp_unit_initialize(unit_number, DSP_TYPE_NONE);

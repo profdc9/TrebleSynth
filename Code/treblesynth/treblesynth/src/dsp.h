@@ -39,14 +39,6 @@ extern "C"
 #define MAX_DSP_UNITS 16
 
 #define MATH_PI_F 3.1415926535f
-#define SINE_TABLE_ENTRIES (1 << 8)
-
-extern int32_t sine_table[];
-void initialize_sine_table(void);
-inline int32_t sine_table_entry(int n)
-{
-    return sine_table[n & (SINE_TABLE_ENTRIES-1)];
-};
 
 #define SAMPLE_CIRC_BUF_SIZE (1u<<15)
 #define SAMPLE_CIRC_BUF_CLEAN_SIZE (1u<<15)

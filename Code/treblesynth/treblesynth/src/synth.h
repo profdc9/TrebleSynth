@@ -78,7 +78,7 @@ typedef struct
     int32_t  harmonic;
     uint32_t control_amplitude;
     uint32_t control_control_gain;
-    uint32_t phase;
+    uint32_t pitch_bend_gain;
 } synth_parm_vco;
 
 typedef struct
@@ -86,6 +86,7 @@ typedef struct
     uint32_t counter;
     uint32_t counter_inc;
     int32_t  counter_semitone_control_gain;
+    int32_t  counter_semitone_pitch_bend_gain;
     int32_t  *control_ptr;
     const int16_t *wave;
 } synth_type_vco;    
@@ -267,6 +268,7 @@ typedef struct
     const char *controldesc;
 } synth_parm_configuration_entry;
 
+void synth_set_pitch_bend_value(uint32_t pitch_bend_value);
 bool synth_unit_set_value(uint synth_unit_number, const char *desc, uint32_t value);
 bool synth_unit_get_value(uint synth_unit_number, const char *desc, uint32_t *value);
 synth_unit_type synth_unit_get_type(uint synth_unit_number);
