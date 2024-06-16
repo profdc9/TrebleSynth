@@ -431,7 +431,14 @@ void reset_control_samples(uint16_t *reset_samples)
             control_enabled[n] = true;
         return;
     }        
-    memcpy(last_samples, reset_samples, sizeof(last_samples));
+    for (uint n=0;n<NUMBER_OF_CONTROLS;n++)
+    {
+        if (reset_samples[n] < (ADC_MAX_VALUE/256))
+            last_samples[n] = ADC_MAX_VALUE/256;
+        else if (reset_samples[n] > (255*ADC_MAX_VALUE/256))
+            last_samples[n] = 255*ADC_MAX_VALUE/256;
+        else last_samples[n] = reset_samples[n];
+    }
     manually_poll_analog_controls();
     for (uint n=0;n<NUMBER_OF_CONTROLS;n++)
     {
@@ -473,18 +480,6 @@ static void alarm_func(uint alarm_num)
     else next_sample2 = (s+(ADC_PREC_VALUE/2)) / (ADC_PREC_VALUE/DAC_PWM_WRAP_VALUE);
 
     counter++;
-
-#if 0
-    pwm_set_both_levels(dac_pwm_b3_slice_num, next_sample, next_sample);
-    pwm_set_both_levels(dac_pwm_b1_slice_num, next_sample, next_sample);
-    pwm_set_both_levels(dac_pwm_a3_slice_num, next_sample, next_sample);
-    pwm_set_both_levels(dac_pwm_a1_slice_num, next_sample, next_sample);
-
-    int32_t s = synth_process_all_units();
-    if (s < (-QUANTIZATION_MAX)) s = -QUANTIZATION_MAX;
-    if (s > (QUANTIZATION_MAX-1)) s = QUANTIZATION_MAX-1;
-    next_sample = (s + QUANTIZATION_MAX) / ((QUANTIZATION_MAX*2) / DAC_PWM_WRAP_VALUE);
-#endif
 
     last_time = delayed_by_us(last_time, 40);
     do

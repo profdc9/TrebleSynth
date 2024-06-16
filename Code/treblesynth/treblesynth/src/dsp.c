@@ -546,8 +546,11 @@ int32_t dsp_type_process_vibrato(int32_t sample, dsp_parm *dp, dsp_unit *du)
     du->dtvibr.sine_counter += du->dtvibr.sine_counter_inc;
     int32_t sine_val = sine_wave_table((du->dtvibr.sine_counter & 0xFFFF) / (65536 / WAVETABLES_LENGTH));
     int32_t mod_val = ((sine_val * dp->dtvibr.modulation) + QUANTIZATION_MAX * 256) / 512;
-    uint32_t delay_samples = (dp->dtvibr.delay_samples * mod_val) / QUANTIZATION_MAX;
-    sample = sample_circ_buf_clean_value(delay_samples);
+    uint32_t delay_samples = (dp->dtvibr.delay_samples * mod_val);
+    int32_t delay_samples_frac = delay_samples & (QUANTIZATION_MAX-1);
+    delay_samples /= QUANTIZATION_MAX;
+    sample = (sample_circ_buf_clean_value(delay_samples)*((QUANTIZATION_MAX-1)-delay_samples_frac) + 
+              sample_circ_buf_clean_value(delay_samples+1)*delay_samples_frac) / QUANTIZATION_MAX;
     return sample;
 }
 
@@ -1024,8 +1027,13 @@ int32_t dsp_type_process_chorus(int32_t sample, dsp_parm *dp, dsp_unit *du)
     du->dtchor.sine_counter += du->dtchor.sine_counter_inc;
     int32_t sine_val = sine_wave_table((du->dtchor.sine_counter & 0xFFFF00) / (0xFFFF0 / WAVETABLES_LENGTH));
     int32_t mod_val = ((sine_val * dp->dtchor.modulation) + QUANTIZATION_MAX * 256) / 512;
-    uint32_t delay_samples = (dp->dtchor.delay_samples * mod_val) / QUANTIZATION_MAX;
-    sample = (sample_circ_buf_clean_value(delay_samples) * ((int32_t)dp->dtchor.mixval) + sample * ((int32_t)(255 - dp->dtchor.mixval))) / 256;
+    
+    uint32_t delay_samples = (dp->dtchor.delay_samples * mod_val);
+    int32_t delay_samples_frac = delay_samples & (QUANTIZATION_MAX-1);
+    delay_samples /= QUANTIZATION_MAX;
+    int32_t new_sample = (sample_circ_buf_clean_value(delay_samples)*((QUANTIZATION_MAX-1)-delay_samples_frac) + 
+                          sample_circ_buf_clean_value(delay_samples+1)*delay_samples_frac) / QUANTIZATION_MAX;
+    sample = (new_sample * ((int32_t)dp->dtchor.mixval) + sample * ((int32_t)(255 - dp->dtchor.mixval))) / 256;
     return sample;
 }
 
@@ -1041,7 +1049,7 @@ const dsp_parm_configuration_entry dsp_parm_configuration_entry_chorus[] =
     { NULL, 0, 4, 0, 0,   1 , NULL   }
 };
 
-const dsp_parm_chorus dsp_parm_chorus_default = { 0, 0, 170, 32, 128, 200, 0, 0 };
+const dsp_parm_chorus dsp_parm_chorus_default = { 0, 0, 70, 32, 128, 200, 0, 0 };
 
 /************************************DSP_TYPE_PHASER*************************************/
 

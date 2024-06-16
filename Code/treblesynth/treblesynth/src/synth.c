@@ -683,6 +683,7 @@ void synth_stop_note(uint8_t note_no, uint8_t velocity)
 
 void synth_panic(void)
 {
+    synth_pitch_bend_value = 0;
     for (int note=0;note<MAX_POLYPHONY;note++)
         if (synth_note_active[note])
         {
