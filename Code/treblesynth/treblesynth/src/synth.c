@@ -698,7 +698,9 @@ void synth_panic(void)
 
 void synth_initialize(void)
 {
-    mutex_init(&synth_mutex);
+    static bool is_mutex_initialized = false;
+    
+    if (!is_mutex_initialized) mutex_init(&synth_mutex);
     synth_current_note_count = 0;
     synth_pitch_bend_value = 0;
     for (int note=0;note<MAX_POLYPHONY;note++)
@@ -710,10 +712,11 @@ void synth_initialize(void)
         synth_note_number[note] = 0;
         synth_note_velocity[note] = 0;
         synth_note_count[note] = 0;
-        mutex_init(&note_mutexes[note]);
+        if (!is_mutex_initialized) mutex_init(&note_mutexes[note]);
     }
     for (int unit_number=0;unit_number<MAX_SYNTH_UNITS;unit_number++) 
         synth_unit_initialize(unit_number, SYNTH_TYPE_NONE);
+    is_mutex_initialized = true;
 }
 
 #ifdef PLACE_IN_RAM

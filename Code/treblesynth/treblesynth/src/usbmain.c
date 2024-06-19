@@ -127,11 +127,11 @@ bool midi_perform_event(const uint8_t cmdbuf[], int num)
    {
        switch (cmdprefix)
        {
-            case 0x90:  gpio_put(25,1);
+            case 0x90:  //gpio_put(25,1);
                         synth_start_note(cmdbuf[1],cmdbuf[2]);
                         ex = true;
                         break;
-            case 0x80:  gpio_put(25,0);
+            case 0x80:  //gpio_put(25,0);
                         synth_stop_note(cmdbuf[1],cmdbuf[2]);
                         ex = true;
                         break;

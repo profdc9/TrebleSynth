@@ -1001,6 +1001,9 @@ int flash_load_bank(uint bankno)
     {
         if (fl->fld.gen_no > last_gen_no)
             last_gen_no = fl->fld.gen_no;
+
+        initialize_dsp();
+        synth_initialize();
         memcpy(desc, fl->fld.desc, sizeof(desc));
         memcpy((void *)&pc, (void *) &fl->fld.pc, sizeof(pc));
         memcpy((void *)samples, (void *) &fl->fld.samples, sizeof(samples));

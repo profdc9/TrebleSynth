@@ -312,6 +312,8 @@ void scroll_number_start(scroll_number_dat *snd)
 {
   snd->changed = 0;
   snd->entered = 0;
+  if (snd->n > snd->maximum_number) snd->n = snd->maximum_number;
+  if (snd->n < snd->minimum_number) snd->n = snd->minimum_number;
   scroll_number_redraw(snd);
   cursoronoff(1);
 }
