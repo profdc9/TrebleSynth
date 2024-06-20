@@ -52,6 +52,7 @@ typedef enum
     SYNTH_TYPE_VCA,
     SYNTH_TYPE_MIXER,
     SYNTH_TYPE_RING,
+    SYNTH_TYPE_NOISE,
     SYNTH_TYPE_MAX_ENTRY
 } synth_unit_type;
 
@@ -105,6 +106,7 @@ typedef struct
     uint32_t control_sustain;
     uint32_t control_decay;
     uint32_t control_release;
+    uint32_t output_type;
 } synth_parm_adsr;
 
 typedef struct
@@ -212,6 +214,31 @@ typedef struct
     int32_t  *control_ptr;
 } synth_type_ring;    
 
+typedef struct
+{
+    synth_unit_type sut;
+    uint32_t source_unit;
+    uint32_t control_unit;
+    int32_t  control_gain;
+    int32_t  amplitude;
+    int32_t  shiftup;
+    uint32_t control_amplitude;
+    uint32_t control_control_gain;
+    uint32_t pitch_bend_gain;
+} synth_parm_noise;
+
+typedef struct
+{
+    uint32_t counter;
+    uint32_t counter_inc;
+    uint32_t last_counter;
+    uint32_t congruential_generator;
+    int32_t  sample;
+    int32_t  counter_semitone_control_gain;
+    int32_t  counter_semitone_pitch_bend_gain;
+    int32_t  *control_ptr;
+} synth_type_noise;    
+
 typedef union 
 {
     synth_type_none         stn;
@@ -222,6 +249,7 @@ typedef union
     synth_type_vca          stvca;
     synth_type_mixer        stmixer;
     synth_type_ring         string;
+    synth_type_noise        stnoise;
 } synth_unit;
 
 typedef union 
@@ -234,6 +262,7 @@ typedef union
     synth_parm_vca          stvca;
     synth_parm_mixer        stmixer;
     synth_parm_ring         string;
+    synth_parm_noise        stnoise;
 } synth_parm;
 
 typedef int32_t (synth_type_process)(synth_parm *sp, synth_unit *su, int note);

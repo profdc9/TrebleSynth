@@ -130,7 +130,7 @@ void synth_note_start_vco(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t
     if (sp->stvco.harmonic != 1)
     {
         int32_t adjvco = (int32_t) vco + harmonic_addition[sp->stvco.harmonic-1];
-        while (adjvco < 0) adjvco += ((QUANTIZATION_MAX/MIDI_NOTES)*12);
+        //while (adjvco < 0) adjvco += ((QUANTIZATION_MAX/MIDI_NOTES)*12);
         while (adjvco > (QUANTIZATION_MAX-1)) adjvco -= ((QUANTIZATION_MAX/MIDI_NOTES)*12);
         vco = adjvco;
     }
@@ -157,7 +157,7 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_vco[] =
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
-const synth_parm_vco synth_parm_vco_default = { 0, 0, 0, 1, 1, 256, 1, 0 };
+const synth_parm_vco synth_parm_vco_default = { 0, 0, 0, 1, 1, 256, 1, 0, 0, 0 };
 
 /**************************** SYNTH_TYPE_ADSR **************************************************/
 
@@ -198,7 +198,9 @@ int32_t synth_type_process_adsr(synth_parm *sp, synth_unit *su, int note)
                      synth_note_active[note] = false;
                  break;
     }
-    return (((*su->stadsr.sample_ptr) * ((int32_t)amplitude)) / QUANTIZATION_MAX);
+    if (sp->stadsr.output_type == 0)
+        return (((*su->stadsr.sample_ptr) * ((int32_t)amplitude)) / QUANTIZATION_MAX);
+    return sp->stadsr.output_type == 1 ? ((int32_t)amplitude) : -((int32_t)amplitude);
 }
 
 void synth_note_start_adsr(synth_parm *sp, synth_unit *su, uint32_t adsr, uint32_t velocity, int note)
@@ -227,6 +229,7 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_adsr[] =
     { "Decay",       offsetof(synth_parm_adsr,decay),                 4, 5, 512, DSP_SAMPLERATE, NULL },
     { "SustainLvl",  offsetof(synth_parm_adsr,sustain_level),         4, 3, 0, 255, NULL },
     { "Release",     offsetof(synth_parm_adsr,release),               4, 5, 512, DSP_SAMPLERATE, NULL },
+    { "OutputType",  offsetof(synth_parm_adsr,output_type),           4, 1, 0, 2, NULL },
     { "AttackCtl",   offsetof(synth_parm_adsr,control_attack),        4, 2, 0, POTENTIOMETER_MAX, "AttackCtl" },
     { "DecayCtl",    offsetof(synth_parm_adsr,control_decay),         4, 2, 0, POTENTIOMETER_MAX, "DecayCtl" },
     { "SustainCtl",  offsetof(synth_parm_adsr,control_sustain),       4, 2, 0, POTENTIOMETER_MAX, "SustainCtl" },
@@ -234,7 +237,7 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_adsr[] =
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
-const synth_parm_adsr synth_parm_adsr_default = { 0, 0, 0,  2000, 4000, 128, 2000, 0, 0, 0, 0 };
+const synth_parm_adsr synth_parm_adsr_default = { 0, 0, 0,  2000, 4000, 128, 2000, 0, 0, 0, 0, 0 };
 
 /**************************** SYNTH_TYPE_LOWPASS **************************************************/
 
@@ -267,8 +270,6 @@ void synth_note_start_lowpass(synth_parm *sp, synth_unit *su, uint32_t vco, uint
     su->stlp.alpha = (int32_t) (a * QUANTIZATION_MAX);  
     su->stlp.dalpha = QUANTIZATION_MAX - su->stlp.alpha;
     su->stlp.sample_ptr = &synth_unit_result[note][sp->stlp.source_unit-1];
-    //set_debug_vals(su->stlp.alpha, (int32_t)(b*1000000.f), (int32_t)(c0*1000000.f));
-
 }
 
 const synth_parm_configuration_entry synth_parm_configuration_entry_lowpass[] = 
@@ -450,6 +451,60 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_ring[] =
 
 const synth_parm_ring synth_parm_ring_default = { 0, 0, 0, 256, 0 };
 
+/**************************** SYNTH_TYPE_NOISE **************************************************/
+
+#ifdef PLACE_IN_RAM
+static int32_t __no_inline_not_in_flash_func(synth_type_process_noise)(synth_parm *sp, synth_unit *su, int note)
+#else
+int32_t synth_type_process_noise(synth_parm *sp, synth_unit *su, int note)
+#endif
+{
+    su->stnoise.counter += (su->stnoise.counter_inc + ((su->stnoise.counter_semitone_control_gain*(*su->stnoise.control_ptr / 64) + 
+                                                        su->stnoise.counter_semitone_pitch_bend_gain * (synth_pitch_bend_value /64))/(QUANTIZATION_MAX/64)));
+    if ( ((su->stnoise.counter ^ su->stnoise.last_counter) & ~(WAVETABLES_LENGTH*SYNTH_OSCILLATOR_PRECISION-1)) != 0)
+    {
+        su->stnoise.last_counter = su->stnoise.counter;
+        su->stnoise.congruential_generator = (su->stnoise.congruential_generator * 1664525u + 1013904223u);
+        su->stnoise.sample = (int32_t)((su->stnoise.congruential_generator >> 16) & (2*QUANTIZATION_MAX - 1)) - QUANTIZATION_MAX;
+    }
+    return (su->stnoise.sample * ((int32_t)sp->stnoise.amplitude)) / 256;
+}
+
+void synth_note_start_noise(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t velocity, int note)
+{
+    if (sp->stnoise.control_amplitude != 0)
+        sp->stnoise.amplitude = read_potentiometer_value(sp->stnoise.control_amplitude)/(POT_MAX_VALUE/256);
+    if (sp->stnoise.control_control_gain != 0)
+        sp->stnoise.control_gain = read_potentiometer_value(sp->stnoise.control_control_gain)/(POT_MAX_VALUE/64);
+
+    if (sp->stnoise.shiftup != 1)
+    {
+        vco += ((QUANTIZATION_MAX/MIDI_NOTES)*6)*sp->stnoise.shiftup;
+        if (vco >= QUANTIZATION_MAX) vco = QUANTIZATION_MAX-1;
+    }
+    float counter_inc_float = counter_fraction_from_vco(vco);
+    su->stnoise.counter_inc = counter_inc_float;
+    float f = counter_inc_float * SEMITONE_LOG_STEP;
+    su->stnoise.counter_semitone_control_gain = f * sp->stnoise.control_gain;
+    su->stnoise.counter_semitone_pitch_bend_gain = f * sp->stnoise.pitch_bend_gain;
+    su->stnoise.control_ptr = &synth_unit_result[note][sp->stnoise.control_unit-1];
+}
+
+const synth_parm_configuration_entry synth_parm_configuration_entry_noise[] = 
+{
+    { "SourceUnit",  offsetof(synth_parm_noise,source_unit),           4, 2, 1, MAX_SYNTH_UNITS, NULL },
+    { "ControlUnit", offsetof(synth_parm_noise,control_unit),          4, 2, 1, MAX_SYNTH_UNITS, NULL },
+    { "Amplitude",   offsetof(synth_parm_noise,amplitude),             4, 3, 0, 256, NULL },        
+    { "ShiftUp",     offsetof(synth_parm_noise,shiftup),               4, 2, 1, 20, NULL },        
+    { "ControlGain", offsetof(synth_parm_noise,control_gain),          4, 2, 0, 63, NULL },
+    { "BendGain",    offsetof(synth_parm_noise,pitch_bend_gain),       4, 2, 0, 63, NULL },
+    { "AmplCtrl",    offsetof(synth_parm_noise,control_amplitude),     4, 2, 0, POTENTIOMETER_MAX, "VCOAmpli" },
+    { "GainCtrl",    offsetof(synth_parm_noise,control_control_gain),  4, 2, 0, POTENTIOMETER_MAX, "VCOGain" },
+    { NULL, 0, 4, 0, 0,   1, NULL    }
+};
+
+const synth_parm_noise synth_parm_noise_default = { 0, 0, 0, 1, 256, 20, 0, 0, 0 };
+
 /************STRUCTURES FOR ALL SYNTH TYPES *****************************/
 
 const char * const stnames[] = 
@@ -462,6 +517,7 @@ const char * const stnames[] =
     "VCA",
     "Mixer",
     "Ring",
+    "Noise",
     NULL
 };
 
@@ -475,6 +531,7 @@ const synth_parm_configuration_entry * const spce[] =
     synth_parm_configuration_entry_vca,
     synth_parm_configuration_entry_mixer,
     synth_parm_configuration_entry_ring,
+    synth_parm_configuration_entry_noise,
     NULL
 };
 
@@ -487,6 +544,7 @@ synth_type_process * const stp[] = {
     synth_type_process_vca,
     synth_type_process_mixer,
     synth_type_process_ring,
+    synth_type_process_noise,
 };
 
 synth_note_start * const sns[] = 
@@ -499,6 +557,7 @@ synth_note_start * const sns[] =
     synth_note_start_vca,
     synth_note_start_mixer,
     synth_note_start_ring,
+    synth_note_start_noise,
 };
 
 const void * const synth_parm_struct_defaults[] =
@@ -511,6 +570,7 @@ const void * const synth_parm_struct_defaults[] =
     (void *) &synth_parm_vca_default,
     (void *) &synth_parm_mixer_default,
     (void *) &synth_parm_ring_default,
+    (void *) &synth_parm_noise_default,
 };
 
 /********************* SYNTH PROCESS STRUCTURE *******************************************/
@@ -606,12 +666,14 @@ static inline int32_t synth_process(synth_parm *sp, synth_unit *su, int note)
 void synth_start_note_val(uint8_t note_no, uint8_t velocity, int note)
 {
     uint32_t vco = ((uint32_t)note_no)*(QUANTIZATION_MAX/MIDI_NOTES);
+    synth_unit *su = synth_unit_entry(note, 0);
+    memset(su,'\000',sizeof(synth_unit)*MAX_SYNTH_UNITS);
+    synth_parm *sp = synth_parm_entry(0);
     for (int unit_no=0;unit_no<MAX_SYNTH_UNITS;unit_no++)
     {
-        synth_unit *su = synth_unit_entry(note, unit_no);
-        synth_parm *sp = synth_parm_entry(unit_no);
-        memset(su,'\000',sizeof(synth_unit));
         sns[(int)sp->stn.sut](sp, su, vco, velocity, note);
+        su++;
+        sp++;
     }
     synth_note_number[note] = note_no;
     synth_note_velocity[note] = velocity;
