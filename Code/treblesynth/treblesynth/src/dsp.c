@@ -885,30 +885,37 @@ int32_t dsp_type_process_compressor(int32_t sample, dsp_parm *dp, dsp_unit *du)
     }
 
     sample = (sample * du->dtcomp.gain) / 4096;
-    if (sample > (ADC_PREC_VALUE/2-1)) sample=ADC_PREC_VALUE/2-1;
-    if (sample < (-ADC_PREC_VALUE/2)) sample=-ADC_PREC_VALUE/2;
+    if (sample > (ADC_PREC_VALUE/2-1)) 
+    {
+        sample=ADC_PREC_VALUE/2-1;
+        du->dtcomp.gain = (du->dtcomp.gain * (4096-dp->dtcomp.release)) / 4096;
+    } else if (sample < (-ADC_PREC_VALUE/2)) 
+    {
+        sample=-ADC_PREC_VALUE/2;
+        du->dtcomp.gain = (du->dtcomp.gain * (4096-dp->dtcomp.release)) / 4096;
+    }
     
     du->dtcomp.level = (du->dtcomp.level*511)/512 + abs(sample);
-    du->dtcomp.nlevel = du->dtcomp.level / 512;
     
     if ((++du->dtcomp.skip)>=4)
     {
         du->dtcomp.skip = 0;
-        if (du->dtcomp.nlevel > dp->dtcomp.release_threshold)
-            du->dtcomp.gain -= (du->dtcomp.gain * dp->dtcomp.release) / 65536;
-        else if (du->dtcomp.nlevel < dp->dtcomp.attack_threshold)
-            du->dtcomp.gain += (du->dtcomp.gain * dp->dtcomp.attack) / 65536;
+        int32_t nlevel = du->dtcomp.level / 512;
+        if (nlevel > dp->dtcomp.release_threshold)
+            du->dtcomp.gain = (du->dtcomp.gain * (4096-dp->dtcomp.release)) / 4096;
+        else if (nlevel < dp->dtcomp.attack_threshold)
+        {
+            du->dtcomp.gain = (du->dtcomp.gain * (4096+dp->dtcomp.attack)) / 4096;
+            if (du->dtcomp.gain > 16384) du->dtcomp.gain = 16384;
+        }
     }
-    
     if (du->dtcomp.gain < 4096) du->dtcomp.gain = 4096;
-    if (du->dtcomp.gain > 16384) du->dtcomp.gain = 16384;
-
     return sample;
 }
 const dsp_parm_configuration_entry dsp_parm_configuration_entry_compressor[] = 
 {
-    { "Attack",       offsetof(dsp_parm_compressor,attack),                  4, 3, 16, 255, NULL },
-    { "Release",      offsetof(dsp_parm_compressor,release),                 4, 3, 16, 255, NULL },
+    { "Attack",       offsetof(dsp_parm_compressor,attack),                  4, 3, 1, 511, NULL },
+    { "Release",      offsetof(dsp_parm_compressor,release),                 4, 3, 1, 511, NULL },
     { "AtkThresh",    offsetof(dsp_parm_compressor,attack_threshold),        4, 5, 0, ADC_PREC_VALUE, NULL },
     { "RlsThresh",    offsetof(dsp_parm_compressor,release_threshold),       4, 5, 0, ADC_PREC_VALUE, NULL },
     { "AtkCtrl",      offsetof(dsp_parm_compressor,control_number1),         4, 2, 0, POTENTIOMETER_MAX, "CompAttk" },
@@ -917,7 +924,7 @@ const dsp_parm_configuration_entry dsp_parm_configuration_entry_compressor[] =
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
-const dsp_parm_compressor dsp_parm_compressor_default = { 0, 0, 40, 400, 100, 3000, 0, 0 };
+const dsp_parm_compressor dsp_parm_compressor_default = { 0, 0, 40, 400, 200, 3000, 0, 0 };
 
 /************************************DSP_TYPE_RING*************************************/
 

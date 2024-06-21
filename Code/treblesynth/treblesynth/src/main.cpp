@@ -83,13 +83,19 @@ const project_configuration pc_default =
 {
   PROJECT_MAGIC_NUMBER,  /* magic_number */
   48,                    /* transpose value */
-  15000,                 /* fail delay */
+  45000,                 /* fail delay */
 };
 
 void initialize_project_configuration(void)
 {
     if (pc.magic_number != PROJECT_MAGIC_NUMBER)
         memcpy((void *)&pc, (void *)&pc_default, sizeof(pc));
+}
+
+void potentiometer_set_state(uint c, bool state)
+{
+    if ((c>=1) && (c<=((sizeof(potentiometer_mapping)/sizeof(potentiometer_mapping[0])))))
+        control_enabled[potentiometer_mapping[c-1]] = state;
 }
 
 void keyboard_poll(void)
@@ -657,6 +663,7 @@ void adjust_dsp_parms_unit(uint8_t unit_no)
                 {
                    dsp_set_value_prec((void *)(((uint8_t *)&dsp_parms[unit_no]) + d[sel-1].offset), d[sel-1].size, snd.n);
                    update_control_values();
+                   potentiometer_set_state(snd.n,true);
                 }
             }
             redraw = 1;
@@ -799,6 +806,7 @@ void adjust_synth_parms_unit(uint8_t unit_no)
                 {
                    synth_set_value_prec((void *)(((uint8_t *)&synth_parms[unit_no]) + sp[sel-1].offset), sp[sel-1].size, snd.n);
                    update_control_values();
+                   potentiometer_set_state(snd.n,true);
                 }
             }
             redraw = 1;

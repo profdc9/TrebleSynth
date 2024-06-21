@@ -446,7 +446,7 @@ typedef struct
 
 typedef struct
 {
-    int32_t  gain, level, nlevel;
+    int32_t  gain, level;
     uint32_t skip;
     uint32_t pot_value1;
     uint32_t pot_value2;
