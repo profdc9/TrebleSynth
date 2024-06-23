@@ -1,5 +1,7 @@
 # Treble Synth
 
+A video about the TrebleSynth:  [Video](https://www.youtube.com/watch?v=252Vte4tYh0)
+
 The TrebleSynth is a "Modular Synth on a Chip" based on the Raspberry Pi Pico.  It is a through-hole design that is easy to assemble yourself and uses only inexpensive generic parts that are widely available to minimize costs.  One can create various modules on the chip and interconnect them by specifying which unit takes input from another input, assign the controls of these modules to potentiometers, and then adjust the potentiometers to achieve your desired sound.  It also has a fully capable effects module on the chip as well.  The modular synth supports six note polyphony.
 
 The synth has a 25 key, two-octave keyboard (though external MIDI controllers are highly recommended, as the built-in synth keys are rudimentary and more suitable for testing).  The TrebleSynth accepts notes over serial MIDI input and outputs the synth keyboard presses over the serial MIDI output.  There is also a USB MIDI input/output, and notes can be played from a computer to the TrebleSynth over USB and similarly the synth keyboard presses are sent over the USB MIDI output.  The are two jacks available for expression and selection pedals.
