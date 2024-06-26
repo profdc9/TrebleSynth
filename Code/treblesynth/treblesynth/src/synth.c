@@ -130,7 +130,6 @@ void synth_note_start_vco(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t
     if (sp->stvco.harmonic != 1)
     {
         int32_t adjvco = (int32_t) vco + harmonic_addition[sp->stvco.harmonic-1];
-        //while (adjvco < 0) adjvco += ((QUANTIZATION_MAX/MIDI_NOTES)*12);
         while (adjvco > (QUANTIZATION_MAX-1)) adjvco -= ((QUANTIZATION_MAX/MIDI_NOTES)*12);
         vco = adjvco;
     }
@@ -195,7 +194,12 @@ int32_t synth_type_process_adsr(synth_parm *sp, synth_unit *su, int note)
                  break;
         case 3:  amplitude = su->stadsr.sustain_amp_level - ((su->stadsr.counter * su->stadsr.release_slope) / ADSR_SLOPE_SCALING);
                  if ((++su->stadsr.counter) >= sp->stadsr.release)
-                     synth_note_active[note] = false;
+                 {
+                     if (sp->stadsr.output_type == 0) 
+                         synth_note_active[note] = false;
+                     else
+                         su->stadsr.phase = 4;
+                 }
                  break;
     }
     if (sp->stadsr.output_type == 0)
@@ -247,11 +251,14 @@ static int32_t __no_inline_not_in_flash_func(synth_type_process_lowpass)(synth_p
 int32_t synth_type_process_lowpass(synth_parm *sp, synth_unit *su, int note)
 #endif
 {
+    int32_t dalpha = (su->stlp.dalpha * (((*su->stlp.control_ptr)/2)+(QUANTIZATION_MAX/2))) / (QUANTIZATION_MAX/2);
+    if (dalpha > (QUANTIZATION_MAX-1)) dalpha = QUANTIZATION_MAX-1;
+    int32_t alpha = (QUANTIZATION_MAX-1) - dalpha;
     int32_t sample = (*su->stlp.sample_ptr);
     for (uint n=0;n<sp->stlp.stages;n++)
     {
         int32_t sy = su->stlp.stage_y[n];
-        sy = (su->stlp.dalpha*sample + su->stlp.alpha*sy) / QUANTIZATION_MAX;
+        sy = (dalpha*sample + alpha*sy) / QUANTIZATION_MAX;
         su->stlp.stage_y[n] = sample = sy;
     }
     return sample;
@@ -263,13 +270,13 @@ void synth_note_start_lowpass(synth_parm *sp, synth_unit *su, uint32_t vco, uint
         sp->stlp.kneefreq = read_potentiometer_value(sp->stlp.control_kneefreq)/(POT_MAX_VALUE/256);
 
     float b = ((float)sp->stlp.kneefreq) * (1.0f/256.0f);
-    float c0 = cosf(frequency_omega_from_vco(vco));
+    float c0 = cosf(sp->stlp.frequency == 0 ? frequency_omega_from_vco(vco) : ((float)sp->stlp.frequency)*((float)(MATH_PI_F*2.0f/((float)DSP_SAMPLERATE))));
     float lbw = 1.0f-b*c0;
     float lb = 1.0f-b;
     float a = (lbw-sqrtf(lbw*lbw-lb*lb)) / lb;
-    su->stlp.alpha = (int32_t) (a * QUANTIZATION_MAX);  
-    su->stlp.dalpha = QUANTIZATION_MAX - su->stlp.alpha;
+    su->stlp.dalpha = (QUANTIZATION_MAX-1) -  ((int32_t) (a * QUANTIZATION_MAX));  
     su->stlp.sample_ptr = &synth_unit_result[note][sp->stlp.source_unit-1];
+    su->stlp.control_ptr = &synth_unit_result[note][sp->stlp.control_unit-1];
 }
 
 const synth_parm_configuration_entry synth_parm_configuration_entry_lowpass[] = 
@@ -278,11 +285,12 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_lowpass[] =
     { "ControlUnit", offsetof(synth_parm_lowpass,control_unit),       4, 2, 1, MAX_SYNTH_UNITS, NULL },
     { "LPFreq",      offsetof(synth_parm_lowpass,kneefreq),           2, 3, 0, 255, NULL },
     { "Stages",      offsetof(synth_parm_lowpass,stages),             4, 1, 0, 4, NULL },
+    { "Frequency",   offsetof(synth_parm_lowpass,frequency),          4, 4, 0, 4000, NULL },
     { "LPFreqCtrl",  offsetof(synth_parm_lowpass,control_kneefreq),   4, 2, 0, POTENTIOMETER_MAX, "LPFreq" },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
-const synth_parm_lowpass synth_parm_lowpass_default = { 0, 0, 0, 192, 4, 0 };
+const synth_parm_lowpass synth_parm_lowpass_default = { 0, 0, 0, 192, 4, 0, 0 };
 
 /**************************** SYNTH_TYPE_OSC **************************************************/
 
@@ -512,7 +520,7 @@ const char * const stnames[] =
     "None",
     "VCO",
     "ADSR",
-    "Lowpass",
+    "VCF",
     "LFO",
     "VCA",
     "Mixer",

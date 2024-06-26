@@ -191,8 +191,7 @@ void midi_uart_poll(void)
     
     int ch = uart0_input();
     
-    if (ch < 0) return;
-    if (ch >= 0xF6) return;
+    if ((ch < 0) || (ch >= 0xF6)) return;
     if (ch & 0x80) num = 0;
     if (num < (sizeof(cmdbuf)/sizeof(cmdbuf[0])))
         cmdbuf[num++] = ch;

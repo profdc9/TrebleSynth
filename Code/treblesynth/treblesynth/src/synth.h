@@ -129,12 +129,13 @@ typedef struct
     uint32_t kneefreq;
     uint32_t stages;
     uint32_t control_kneefreq;
+    uint32_t frequency;
 } synth_parm_lowpass;
 
 typedef struct
 {
     int32_t   *sample_ptr;
-    int32_t   alpha;
+    int32_t   *control_ptr;
     int32_t   dalpha;
     int32_t   stage_y[4];
 } synth_type_lowpass;
