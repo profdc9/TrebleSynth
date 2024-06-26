@@ -123,21 +123,37 @@ bool midi_perform_event(const uint8_t cmdbuf[], int num)
 {
    bool ex = false;
    int cmdprefix = cmdbuf[0] & 0xF0;
+   
    if (num > 2)
    {
        switch (cmdprefix)
        {
-            case 0x90:  //gpio_put(25,1);
-                        synth_start_note(cmdbuf[1],cmdbuf[2]);
+            case 0x90:  
+                        if (cmdbuf[2] == 0)
+                        {
+                            synth_stop_note(cmdbuf[1],0);
+                            gpio_put(LED_PIN,0);
+                        } else
+                        {
+                            synth_start_note(cmdbuf[1],cmdbuf[2]);
+                            gpio_put(LED_PIN,1);
+                        }
                         ex = true;
                         break;
-            case 0x80:  //gpio_put(25,0);
+            case 0x80:  gpio_put(LED_PIN,0);
                         synth_stop_note(cmdbuf[1],cmdbuf[2]);
                         ex = true;
+                        break;
+            case 0xB0:  if ((cmdbuf[1] == 120) || (cmdbuf[1] == 123))
+                        {   
+                            synth_panic();
+                            ex = true;
+                        }
                         break;
             case 0xE0:  {
                            uint32_t pitch_bend = ((int32_t)(cmdbuf[1] & 0x7F)) + (((int32_t)(cmdbuf[2] & 0x7F)) * 128);
                            synth_set_pitch_bend_value(pitch_bend);
+                           ex = true;
                         }
                         break;
        }
@@ -176,10 +192,11 @@ void midi_uart_poll(void)
     int ch = uart0_input();
     
     if (ch < 0) return;
+    if (ch >= 0xF6) return;
     if (ch & 0x80) num = 0;
     if (num < (sizeof(cmdbuf)/sizeof(cmdbuf[0])))
         cmdbuf[num++] = ch;
-    if ((num >= 2) && (midi_perform_event(cmdbuf, num))) num = 0;
+    if ((num >= 2) && (midi_perform_event(cmdbuf, num))) num = 1;
 }
 
 void midi_task(void)

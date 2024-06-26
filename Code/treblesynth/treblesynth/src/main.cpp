@@ -1178,13 +1178,13 @@ void debugstuff(void)
             }
         }
         ssd1306_Clear_Buffer();
-        sprintf(str,"v1=%d",dv1);
+        sprintf(str,"v1=%X",dv1);
         ssd1306_set_cursor(0,0);
         ssd1306_printstring(str);
-        sprintf(str,"v2=%d",dv2);
+        sprintf(str,"v2=%X",dv2);
         ssd1306_set_cursor(0,1);
         ssd1306_printstring(str);
-        sprintf(str,"v3=%d",dv3);
+        sprintf(str,"v3=%X",dv3);
         ssd1306_set_cursor(0,2);
         ssd1306_printstring(str);
         sprintf(str,"%u %c%c%c%c%c",counter,buttonpressed(0),buttonpressed(1),buttonpressed(2),buttonpressed(3),buttonpressed(4));

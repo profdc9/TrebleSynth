@@ -233,7 +233,7 @@ typedef struct
     uint32_t counter_inc;
     uint32_t last_counter;
     uint32_t congruential_generator;
-    int32_t  sample;
+    int32_t  sample, sample2;
     int32_t  counter_semitone_control_gain;
     int32_t  counter_semitone_pitch_bend_gain;
     int32_t  *control_ptr;
