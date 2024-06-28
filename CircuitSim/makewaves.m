@@ -26,6 +26,9 @@ ang=(0:n-1)*(2*pi/n);
 
 sinwv = floor(sin(ang)*qmax+0.5);
 
+rectwv = (sinwv>0).*sinwv;
+rectwv = floor(maxone(subzero(rectwv))*qmax+0.5);
+
 halfwv = sin((0:n-1)*(pi/n));
 halfwv = floor(maxone(subzero(halfwv))*qmax+0.5);
 
@@ -59,34 +62,84 @@ for n=1:2:33
 end
 sqrwv3 = floor(maxone(subzero(sqrwv3))*qmax+0.5);
 
+wd1 = sin(ang)-sin(2*ang)+sin(3*ang)-sin(4*ang)+sin(5*ang);
+wd1 = floor(maxone(subzero(wd1))*qmax+0.5);
+
+wd2 = cos(ang)-sin(2*ang)/2+cos(3*ang)/3-sin(4*ang)/4+cos(5*ang)/5-sin(6*ang)/6+cos(7*ang)/7;
+wd2 = floor(maxone(subzero(wd2))*qmax+0.5);
+
+wd3 = sin(2*ang)/2-cos(3*ang)/3+sin(4*ang)/4+cos(5*ang)/5;
+wd3 = floor(maxone(subzero(wd3))*qmax+0.5);
+
+wd4 = -cos(ang)+cos(2*ang)/2-cos(3*ang)/3+cos(4*ang)/4-cos(5*ang)/5+cos(6*ang/6)-cos(7*ang)/7;
+wd4 = floor(maxone(subzero(wd4))*qmax+0.5);
+
+wd5 = cos(ang)-cos(3*ang)+sin(5*ang)-sin(7*ang)+cos(9*ang);
+wd5 = floor(maxone(subzero(wd5))*qmax+0.5);
+
+wd6 = (cos(ang*0.5).^2+1).^5;
+wd6 = floor(maxone(subzero(wd6))*qmax+0.5);
+
+wd7 = cos(ang)-cos(2*ang)/3+cos(4*ang)/5-cos(6*ang)/7+cos(8*ang)/9-cos(10*ang)/11;
+wd7 = floor(maxone(subzero(wd7))*qmax+0.5);
+
+wd8 = cos(ang)-cos(2*ang)*sqrt(2)+sin(3*ang)*sqrt(3)-sin(4*ang)*sqrt(4)+cos(5*ang)*sqrt(5);
+wd8 = floor(maxone(subzero(wd8))*qmax+0.5);
 
 writeary(fp,sinwv,'table_sine');
 writeary(fp,halfwv,'table_halfsine');
-writeary(fp,sqrwv,'table_square');
+writeary(fp,rectwv,'table_rectsine');
 writeary(fp,triwv,'table_triangle');
 writeary(fp,sawwv,'table_sawtooth');
 writeary(fp,sqrwv,'table_squarewave');
 writeary(fp,sqrwv2,'table_squarewave2');
 writeary(fp,sqrwv3,'table_squarewave3');
+writeary(fp,wd1,'table_wd1');
+writeary(fp,wd2,'table_wd2');
+writeary(fp,wd3,'table_wd3');
+writeary(fp,wd4,'table_wd4');
+writeary(fp,wd5,'table_wd5');
+writeary(fp,wd6,'table_wd6');
+writeary(fp,wd7,'table_wd7');
+writeary(fp,wd8,'table_wd8');
 
-fprintf(fp,'const int16_t *wavetables[8]= { table_sine, table_halfsine, table_square, table_triangle, table_sawtooth, table_squarewave, table_squarewave2, table_squarewave3 };\r\n');
+fprintf(fp,'const int16_t *wavetables[16]= { table_sine, table_halfsine, table_rectsine, table_triangle, table_sawtooth, table_squarewave, table_squarewave2, table_squarewave3, table_wd1, table_wd2, table_wd3, table_wd4, table_wd5, table_wd6, table_wd7, table_wd8 };\r\n');
 fclose(fp);
 
 figure(1);clf;
-subplot(3,3,1);
+subplot(4,4,1);
 plot(ang,sinwv);
-subplot(3,3,2);
+subplot(4,4,2);
+plot(ang,rectwv);
+subplot(4,4,3);
 plot(ang,triwv);
-subplot(3,3,3);
+subplot(4,4,4);
 plot(ang,sawwv);
-subplot(3,3,4);
+subplot(4,4,5);
 plot(ang,sqrwv);
-subplot(3,3,5);
+subplot(4,4,6);
 plot(ang,sqrwv2);
-subplot(3,3,6);
+subplot(4,4,7);
 plot(ang,sqrwv3);
-subplot(3,3,7);
+subplot(4,4,8);
 plot(ang,halfwv);
+subplot(4,4,9);
+plot(ang,wd1);
+subplot(4,4,10);
+plot(ang,wd2);
+subplot(4,4,11);
+plot(ang,wd3);
+subplot(4,4,12);
+plot(ang,wd4);
+subplot(4,4,13);
+plot(ang,wd5);
+subplot(4,4,14);
+plot(ang,wd6);
+subplot(4,4,15);
+plot(ang,wd7);
+subplot(4,4,16);
+plot(ang,wd8);
+
 
 endfunction
 

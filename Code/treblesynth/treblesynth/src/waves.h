@@ -31,7 +31,7 @@ extern "C" {
 
 #include <stdint.h>
 
-#define WAVETABLES_NUMBER 8
+#define WAVETABLES_NUMBER 16
 #define WAVETABLES_LENGTH 1024
 
 extern const int16_t *wavetables[WAVETABLES_NUMBER];

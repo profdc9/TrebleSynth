@@ -146,7 +146,7 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_vco[] =
 {
     { "SourceUnit",  offsetof(synth_parm_vco,source_unit),           4, 2, 1, MAX_SYNTH_UNITS, NULL },
     { "ControlUnit", offsetof(synth_parm_vco,control_unit),          4, 2, 1, MAX_SYNTH_UNITS, NULL },
-    { "OscType",     offsetof(synth_parm_vco,osc_type),              4, 1, 1, WAVETABLES_NUMBER, NULL },
+    { "OscType",     offsetof(synth_parm_vco,osc_type),              4, 2, 1, WAVETABLES_NUMBER, NULL },
     { "Amplitude",   offsetof(synth_parm_vco,amplitude),             4, 3, 0, 256, NULL },        
     { "Harmonic",    offsetof(synth_parm_vco,harmonic),              4, 1, 1, sizeof(harmonic_addition)/sizeof(int32_t), NULL },        
     { "ControlGain", offsetof(synth_parm_vco,control_gain),          4, 2, 0, 63, NULL },
@@ -342,7 +342,7 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_osc[] =
     { "ControlUnit", offsetof(synth_parm_osc,control_unit),       4, 2, 1, MAX_SYNTH_UNITS, NULL },
     { "Frequency",   offsetof(synth_parm_osc,frequency),          4, 4, OSC_MINFREQ, OSC_MAXFREQ, NULL },
     { "Amplitude",   offsetof(synth_parm_osc,amplitude),          4, 3, 0, 256,  NULL },
-    { "OscType",     offsetof(synth_parm_osc,osc_type),           4, 1, 1, 8, NULL },
+    { "OscType",     offsetof(synth_parm_osc,osc_type),           4, 2, 1, 8, NULL },
     { "ControlGain", offsetof(synth_parm_osc,control_gain),       4, 2, 0, 15, NULL },
     { "BendGain",    offsetof(synth_parm_osc,bend_gain),          4, 2, 0, 15, NULL },
     { "BendCtrl",    offsetof(synth_parm_osc,control_bend),       4, 2, 0, POTENTIOMETER_MAX, "LFOFMGain" },

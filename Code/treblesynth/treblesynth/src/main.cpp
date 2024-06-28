@@ -121,7 +121,7 @@ void controls_poll(void)
         int m = potentiometer_mapping[c-1];
         if ((control_value[c][0] != '\000') && (control_value[c][0] != ' ') && (sample_changed[m]))
         {
-            write_str_with_spaces(0,7,control_enabled[m] ? "*" : (control_direction[m] ? "<" : ">"),1);
+            write_str_with_spaces(0,7,control_enabled[m] ? "\015" : (control_direction[m] ? "\014" : "\013"),1);
             write_str_with_spaces(1,7,control_value[c],14);
 
             pos = 3;
