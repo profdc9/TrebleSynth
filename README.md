@@ -55,7 +55,7 @@ Up to 10 modules can be used at a time.  Subtractive and FM synthesis is possibl
 
 The effects may be cascaded, to up to 16 in a sequence.  Since the synthesizer has an audio input, at some point I will likely implement audio pass-through so the TrebleSynth can act as a guitar pedal as well like the GuitarPico.
 
-![Picture](TrebleSynth/TrebleSynth.png)
+![Picture](pics/TrebleSynth.jpg)
 
 A list of parts is included below, with [LCSC](https://lcsc.com) part numbers (with noted exceptions), minimum quantity order, and prices as of the time of writing (2024-06-24).  For some of the resistors and capacitors, you may be better off buying an assortment kit rather than ordering large quantities.
 
@@ -102,3 +102,4 @@ A list of parts is included below, with [LCSC](https://lcsc.com) part numbers (w
 41.  470 ohm 1/4 watt metal film ($0.0091/pc, QTY 50, C129899)
 42.  22 pF 50+ V ceramic disc capacitor ($0.0092/pc, QTY 50, C2832510)
 43.  SSD1306 128x64 OLED display (4 pin I2C version) - available on Aliexpress or Amazon
+44.  8 pin DIP socket ($0.0240/pc, QTY 20, C72124)
