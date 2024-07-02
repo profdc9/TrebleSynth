@@ -191,13 +191,14 @@ typedef struct
     int32_t  amplitude;
     uint32_t control_mixval;
     uint32_t control_amplitude;
+    int32_t  control_gain;
 } synth_parm_mixer;
 
 typedef struct
 {
-    int32_t  emixval;
     int32_t  *sample_ptr;
     int32_t  *sample2_ptr;
+    int32_t  *control_ptr;
 } synth_type_mixer;
 
 typedef struct

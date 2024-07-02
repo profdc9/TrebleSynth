@@ -313,7 +313,7 @@ int32_t synth_type_process_osc(synth_parm *sp, synth_unit *su, int note)
 }
 
 #define OSC_MINFREQ 1.0f
-#define OSC_MAXFREQ 4000.0f
+#define OSC_MAXFREQ 100.0f
 
 const float osc_scaling = logf( OSC_MAXFREQ / OSC_MINFREQ ) / ((float)POT_MAX_VALUE);
 
@@ -397,20 +397,24 @@ static int32_t __no_inline_not_in_flash_func(synth_type_process_mixer)(synth_par
 int32_t synth_type_process_mixer(synth_parm *sp, synth_unit *su, int note)
 #endif
 {
-    int32_t sample = ((*su->stmixer.sample_ptr) * ((int32_t) sp->stmixer.mixval) + (*su->stmixer.sample2_ptr) * su->stmixer.emixval) / 256;
+    int32_t control = ((*su->stmixer.control_ptr) * ((int32_t)sp->stmixer.control_gain)) / 256;
+    int32_t mixval =  (control/(QUANTIZATION_MAX/256)) + sp->stmixer.mixval;
+    if (mixval > 255) mixval = 255;
+    else if (mixval < 0) mixval = 0;
+    int32_t sample = (((*su->stmixer.sample_ptr) * mixval) + ((*su->stmixer.sample2_ptr) * (255-mixval))) / 256;
     sample = (sample * ((int32_t) sp->stmixer.amplitude)) / 256;
     return sample;
 }
 
 void synth_note_start_mixer(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t velocity, int note)
 {
-    su->stmixer.emixval = 256-sp->stmixer.mixval;
     if (sp->stmixer.control_mixval != 0)
         sp->stmixer.mixval = read_potentiometer_value(sp->stmixer.control_mixval)/(POT_MAX_VALUE/256);
     if (sp->stmixer.control_amplitude != 0)
         sp->stmixer.amplitude = read_potentiometer_value(sp->stmixer.control_amplitude)/(POT_MAX_VALUE/256);
     su->stmixer.sample_ptr = &synth_unit_result[note][sp->stmixer.source_unit-1];
     su->stmixer.sample2_ptr = &synth_unit_result[note][sp->stmixer.source2_unit-1];
+    su->stmixer.control_ptr = &synth_unit_result[note][sp->stmixer.control_unit-1];
 }
 
 const synth_parm_configuration_entry synth_parm_configuration_entry_mixer[] = 
@@ -420,12 +424,13 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_mixer[] =
     { "Source2Unit",  offsetof(synth_parm_mixer,source2_unit) ,      4, 2, 1, MAX_SYNTH_UNITS, NULL },
     { "Mixval",       offsetof(synth_parm_mixer,mixval),             4, 3, 0, 256, NULL },        
     { "Amplitude",    offsetof(synth_parm_mixer,amplitude),          4, 3, 0, 256, NULL },        
+    { "ControlGain",  offsetof(synth_parm_mixer,control_gain),       4, 3, 0, 256, NULL },
     { "MixCtrl",      offsetof(synth_parm_mixer,control_mixval),     4, 2, 0, POTENTIOMETER_MAX, "MixerBal" },
     { "AmplCtrl",     offsetof(synth_parm_mixer,control_amplitude),  4, 2, 0, POTENTIOMETER_MAX, "MixerAmpli" },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
-const synth_parm_mixer synth_parm_mixer_default = { 0, 0, 0, 1, 128, 256, 0, 0 };
+const synth_parm_mixer synth_parm_mixer_default = { 0, 0, 0, 1, 128, 256, 0, 0, 255};
 
 /**************************** SYNTH_TYPE_RING **************************************************/
 
