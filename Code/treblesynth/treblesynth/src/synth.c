@@ -251,7 +251,7 @@ static int32_t __no_inline_not_in_flash_func(synth_type_process_lowpass)(synth_p
 int32_t synth_type_process_lowpass(synth_parm *sp, synth_unit *su, int note)
 #endif
 {
-    int32_t dalpha = (su->stlp.dalpha * (((*su->stlp.control_ptr)/2)+(QUANTIZATION_MAX/2))) / (QUANTIZATION_MAX/2);
+    int32_t dalpha = su->stlp.dalpha + (((int32_t)(*su->stlp.control_ptr))*((int32_t)sp->stlp.control_gain))/256;
     if (dalpha > (QUANTIZATION_MAX-1)) dalpha = QUANTIZATION_MAX-1;
     int32_t alpha = (QUANTIZATION_MAX-1) - dalpha;
     int32_t sample = (*su->stlp.sample_ptr);
@@ -286,11 +286,12 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_lowpass[] =
     { "LPFreq",      offsetof(synth_parm_lowpass,kneefreq),           2, 3, 0, 255, NULL },
     { "Stages",      offsetof(synth_parm_lowpass,stages),             4, 1, 0, 4, NULL },
     { "Frequency",   offsetof(synth_parm_lowpass,frequency),          4, 4, 0, 4000, NULL },
+    { "ControlGain", offsetof(synth_parm_lowpass,control_gain),       4, 3, 0, 255, NULL },
     { "LPFreqCtrl",  offsetof(synth_parm_lowpass,control_kneefreq),   4, 2, 0, POTENTIOMETER_MAX, "LPFreq" },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
-const synth_parm_lowpass synth_parm_lowpass_default = { 0, 0, 0, 192, 4, 0, 0 };
+const synth_parm_lowpass synth_parm_lowpass_default = { 0, 0, 0, 192, 4, 0, 0, 255 };
 
 /**************************** SYNTH_TYPE_OSC **************************************************/
 

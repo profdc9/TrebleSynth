@@ -130,6 +130,7 @@ typedef struct
     uint32_t stages;
     uint32_t control_kneefreq;
     uint32_t frequency;
+    uint32_t control_gain;
 } synth_parm_lowpass;
 
 typedef struct
