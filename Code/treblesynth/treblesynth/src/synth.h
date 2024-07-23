@@ -37,7 +37,7 @@ extern "C"
 #define MIDI_NOTES 128
 
 #define MAX_POLYPHONY 6
-#define DIVIDER_POLYPHONY 4
+#define DIVIDER_POLYPHONY 2
 #define MAX_SYNTH_UNITS 10
 #define SYNTH_OSCILLATOR_PRECISION 256
 #define SYNTH_STOPPING_COUNTER 256
@@ -131,12 +131,14 @@ typedef struct
     uint32_t control_kneefreq;
     uint32_t frequency;
     uint32_t control_gain;
+    uint32_t resonance;
 } synth_parm_lowpass;
 
 typedef struct
 {
     int32_t   *sample_ptr;
     int32_t   *control_ptr;
+    int32_t   *feedback_ptr;
     int32_t   dalpha;
     int32_t   stage_y[4];
 } synth_type_lowpass;

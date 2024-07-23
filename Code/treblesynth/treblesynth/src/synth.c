@@ -254,13 +254,11 @@ int32_t synth_type_process_lowpass(synth_parm *sp, synth_unit *su, int note)
     int32_t dalpha = su->stlp.dalpha + (((int32_t)(*su->stlp.control_ptr))*((int32_t)sp->stlp.control_gain))/256;
     if (dalpha > (QUANTIZATION_MAX-1)) dalpha = QUANTIZATION_MAX-1;
     int32_t alpha = (QUANTIZATION_MAX-1) - dalpha;
-    int32_t sample = (*su->stlp.sample_ptr);
+    int32_t sample = (*su->stlp.sample_ptr) - ((*su->stlp.feedback_ptr)*((int32_t)sp->stlp.resonance)) / 64;
+    if (sample > (QUANTIZATION_MAX-1)) sample = QUANTIZATION_MAX-1;
+    if (sample < (-QUANTIZATION_MAX)) sample = -QUANTIZATION_MAX;
     for (uint n=0;n<sp->stlp.stages;n++)
-    {
-        int32_t sy = su->stlp.stage_y[n];
-        sy = (dalpha*sample + alpha*sy) / QUANTIZATION_MAX;
-        su->stlp.stage_y[n] = sample = sy;
-    }
+        su->stlp.stage_y[n] = sample = (dalpha*sample + alpha*su->stlp.stage_y[n]) / QUANTIZATION_MAX;
     return sample;
 }
 
@@ -277,6 +275,7 @@ void synth_note_start_lowpass(synth_parm *sp, synth_unit *su, uint32_t vco, uint
     su->stlp.dalpha = (QUANTIZATION_MAX-1) -  ((int32_t) (a * QUANTIZATION_MAX));  
     su->stlp.sample_ptr = &synth_unit_result[note][sp->stlp.source_unit-1];
     su->stlp.control_ptr = &synth_unit_result[note][sp->stlp.control_unit-1];
+    su->stlp.feedback_ptr = &su->stlp.stage_y[sp->stlp.stages-1];
 }
 
 const synth_parm_configuration_entry synth_parm_configuration_entry_lowpass[] = 
@@ -287,11 +286,12 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_lowpass[] =
     { "Stages",      offsetof(synth_parm_lowpass,stages),             4, 1, 0, 4, NULL },
     { "Frequency",   offsetof(synth_parm_lowpass,frequency),          4, 4, 0, 4000, NULL },
     { "ControlGain", offsetof(synth_parm_lowpass,control_gain),       4, 3, 0, 255, NULL },
+    { "Resonance",   offsetof(synth_parm_lowpass,resonance),          4, 3, 0, 255, NULL },
     { "LPFreqCtrl",  offsetof(synth_parm_lowpass,control_kneefreq),   4, 2, 0, POTENTIOMETER_MAX, "LPFreq" },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
-const synth_parm_lowpass synth_parm_lowpass_default = { 0, 0, 0, 192, 4, 0, 0, 255 };
+const synth_parm_lowpass synth_parm_lowpass_default = { 0, 0, 0, 192, 4, 0, 0, 255, 0 };
 
 /**************************** SYNTH_TYPE_OSC **************************************************/
 
