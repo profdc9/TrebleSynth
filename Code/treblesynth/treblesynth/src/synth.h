@@ -37,7 +37,7 @@ extern "C"
 #define MIDI_NOTES 128
 
 #define MAX_POLYPHONY 6
-#define DIVIDER_POLYPHONY 2
+#define DIVIDER_POLYPHONY 4
 #define MAX_SYNTH_UNITS 10
 #define SYNTH_OSCILLATOR_PRECISION 256
 #define SYNTH_STOPPING_COUNTER 256
@@ -80,6 +80,7 @@ typedef struct
     uint32_t control_amplitude;
     uint32_t control_control_gain;
     uint32_t pitch_bend_gain;
+    uint32_t detune;
 } synth_parm_vco;
 
 typedef struct
@@ -119,6 +120,7 @@ typedef struct
     uint32_t rise_slope;
     uint32_t decay_slope;
     uint32_t release_slope;
+    uint32_t note;
 } synth_type_adsr;    
 
 typedef struct
@@ -270,8 +272,16 @@ typedef union
     synth_parm_noise        stnoise;
 } synth_parm;
 
-typedef int32_t (synth_type_process)(synth_parm *sp, synth_unit *su, int note);
-typedef void (synth_note_start)(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t velocity, int note);
+typedef struct
+{
+    uint32_t note_no;
+    uint32_t vco;
+    uint32_t velocity;
+    uint32_t note;
+} synth_start_st;
+
+typedef int32_t (synth_type_process)(synth_parm *sp, synth_unit *su);
+typedef void (synth_note_start)(synth_parm *sp, synth_unit *su, synth_start_st *sst);
 
 int32_t synth_process_all_units(void);
 void synth_unit_struct_zero(synth_unit *su);

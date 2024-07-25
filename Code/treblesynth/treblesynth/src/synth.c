@@ -76,17 +76,17 @@ inline float counter_fraction_from_vco(uint32_t vco)
 /**************************** SYNTH_TYPE_NONE **************************************************/
 
 #ifdef PLACE_IN_RAM
-static int32_t __no_inline_not_in_flash_func(synth_type_process_none)(synth_parm *sp, synth_unit *su, int note)
+static int32_t __no_inline_not_in_flash_func(synth_type_process_none)(synth_parm *sp, synth_unit *su)
 #else
-int32_t synth_type_process_none(synth_parm *sp, synth_unit *su, int note)
+int32_t synth_type_process_none(synth_parm *sp, synth_unit *su)
 #endif
 {
     return (*su->stn.sample_ptr);
 }
 
-void synth_note_start_none(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t velocity, int note)
+void synth_note_start_none(synth_parm *sp, synth_unit *su, synth_start_st *sst)
 {
-    su->stn.sample_ptr = &synth_unit_result[note][sp->stn.source_unit-1];
+    su->stn.sample_ptr = &synth_unit_result[sst->note][sp->stn.source_unit-1];
 }
 
 const synth_parm_configuration_entry synth_parm_configuration_entry_none[] = 
@@ -101,9 +101,9 @@ const synth_parm_none synth_parm_none_default = { 0, 0, 0 };
 /**************************** SYNTH_TYPE_VCO **************************************************/
 
 #ifdef PLACE_IN_RAM
-static int32_t __no_inline_not_in_flash_func(synth_type_process_vco)(synth_parm *sp, synth_unit *su, int note)
+static int32_t __no_inline_not_in_flash_func(synth_type_process_vco)(synth_parm *sp, synth_unit *su)
 #else
-int32_t synth_type_process_vco(synth_parm *sp, synth_unit *su, int note)
+int32_t synth_type_process_vco(synth_parm *sp, synth_unit *su)
 #endif
 {
     su->stvco.counter += (su->stvco.counter_inc + ((su->stvco.counter_semitone_control_gain*(*su->stvco.control_ptr / 64) + 
@@ -120,26 +120,25 @@ const int32_t harmonic_addition[7] = { 0, (int32_t) (12.0f*(QUANTIZATION_MAX/MID
                                        (int32_t) (31.01955f*(QUANTIZATION_MAX/MIDI_NOTES)),
                                        (int32_t) (33.688259f*(QUANTIZATION_MAX/MIDI_NOTES)) };
 
-void synth_note_start_vco(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t velocity, int note)
+void synth_note_start_vco(synth_parm *sp, synth_unit *su, synth_start_st *sst)
 {
     if (sp->stvco.control_amplitude != 0)
         sp->stvco.amplitude = read_potentiometer_value(sp->stvco.control_amplitude)/(POT_MAX_VALUE/256);
     if (sp->stvco.control_control_gain != 0)
         sp->stvco.control_gain = read_potentiometer_value(sp->stvco.control_control_gain)/(POT_MAX_VALUE/64);
 
+    int32_t vco = sst->vco + (sp->stvco.detune - 4096);
     if (sp->stvco.harmonic != 1)
-    {
-        int32_t adjvco = (int32_t) vco + harmonic_addition[sp->stvco.harmonic-1];
-        while (adjvco > (QUANTIZATION_MAX-1)) adjvco -= ((QUANTIZATION_MAX/MIDI_NOTES)*12);
-        vco = adjvco;
-    }
-    float counter_inc_float = counter_fraction_from_vco(vco);
+        vco += harmonic_addition[sp->stvco.harmonic-1];
+    while (vco > (QUANTIZATION_MAX-1)) vco -= ((QUANTIZATION_MAX/MIDI_NOTES)*12);
+    while (vco < 0) vco += ((QUANTIZATION_MAX/MIDI_NOTES)*12);
+    float counter_inc_float = counter_fraction_from_vco(((uint32_t)vco));
     su->stvco.counter_inc = counter_inc_float;
     float f = counter_inc_float * SEMITONE_LOG_STEP;
     su->stvco.counter_semitone_control_gain = f * sp->stvco.control_gain;
     su->stvco.counter_semitone_pitch_bend_gain = f * sp->stvco.pitch_bend_gain;
     su->stvco.wave = wavetables[sp->stvco.osc_type-1];
-    su->stvco.control_ptr = &synth_unit_result[note][sp->stvco.control_unit-1];
+    su->stvco.control_ptr = &synth_unit_result[sst->note][sp->stvco.control_unit-1];
 }
 
 const synth_parm_configuration_entry synth_parm_configuration_entry_vco[] = 
@@ -148,7 +147,8 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_vco[] =
     { "ControlUnit", offsetof(synth_parm_vco,control_unit),          4, 2, 1, MAX_SYNTH_UNITS, NULL },
     { "OscType",     offsetof(synth_parm_vco,osc_type),              4, 2, 1, WAVETABLES_NUMBER, NULL },
     { "Amplitude",   offsetof(synth_parm_vco,amplitude),             4, 3, 0, 256, NULL },        
-    { "Harmonic",    offsetof(synth_parm_vco,harmonic),              4, 1, 1, sizeof(harmonic_addition)/sizeof(int32_t), NULL },        
+    { "Harmonic",    offsetof(synth_parm_vco,harmonic),              4, 1, 1, sizeof(harmonic_addition)/sizeof(int32_t), NULL },
+    { "Detune",      offsetof(synth_parm_vco,detune),                4, 4, 0, 8191, NULL },
     { "ControlGain", offsetof(synth_parm_vco,control_gain),          4, 2, 0, 63, NULL },
     { "BendGain",    offsetof(synth_parm_vco,pitch_bend_gain),       4, 2, 0, 63, NULL },
     { "AmplCtrl",    offsetof(synth_parm_vco,control_amplitude),     4, 2, 0, POTENTIOMETER_MAX, "VCOAmpli" },
@@ -156,16 +156,16 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_vco[] =
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
-const synth_parm_vco synth_parm_vco_default = { 0, 0, 0, 1, 1, 256, 1, 0, 0, 0 };
+const synth_parm_vco synth_parm_vco_default = { 0, 0, 0, 1, 1, 256, 1, 0, 0, 0, 4096 };
 
 /**************************** SYNTH_TYPE_ADSR **************************************************/
 
 #define ADSR_SLOPE_SCALING 256
 
 #ifdef PLACE_IN_RAM
-static int32_t __no_inline_not_in_flash_func(synth_type_process_adsr)(synth_parm *sp, synth_unit *su, int note)
+static int32_t __no_inline_not_in_flash_func(synth_type_process_adsr)(synth_parm *sp, synth_unit *su)
 #else
-int32_t synth_type_process_adsr(synth_parm *sp, synth_unit *su, int note)
+int32_t synth_type_process_adsr(synth_parm *sp, synth_unit *su)
 #endif
 {
     uint32_t amplitude = 0;
@@ -186,7 +186,7 @@ int32_t synth_type_process_adsr(synth_parm *sp, synth_unit *su, int note)
                  }
                  break;
         case 2:  amplitude = su->stadsr.sustain_amp_level;
-                 if (synth_note_stopping[note])
+                 if (synth_note_stopping[su->stadsr.note])
                  {
                      su->stadsr.counter = 0;
                      su->stadsr.phase = 3;
@@ -196,7 +196,7 @@ int32_t synth_type_process_adsr(synth_parm *sp, synth_unit *su, int note)
                  if ((++su->stadsr.counter) >= sp->stadsr.release)
                  {
                      if (sp->stadsr.output_type == 0) 
-                         synth_note_active[note] = false;
+                         synth_note_active[su->stadsr.note] = false;
                      else
                          su->stadsr.phase = 4;
                  }
@@ -207,32 +207,33 @@ int32_t synth_type_process_adsr(synth_parm *sp, synth_unit *su, int note)
     return sp->stadsr.output_type == 1 ? ((int32_t)amplitude) : -((int32_t)amplitude);
 }
 
-void synth_note_start_adsr(synth_parm *sp, synth_unit *su, uint32_t adsr, uint32_t velocity, int note)
+void synth_note_start_adsr(synth_parm *sp, synth_unit *su, synth_start_st *sst)
 {
-    su->stadsr.max_amp_level = (velocity * QUANTIZATION_MAX) / 128;
+    su->stadsr.max_amp_level = (sst->velocity * QUANTIZATION_MAX) / 128;
     if (sp->stadsr.control_sustain != 0)
         sp->stadsr.sustain_level = read_potentiometer_value(sp->stadsr.control_sustain)/64;
     su->stadsr.sustain_amp_level = (su->stadsr.max_amp_level * sp->stadsr.sustain_level) / 256;
     if (sp->stadsr.control_attack != 0)
-        sp->stadsr.attack = read_potentiometer_value(sp->stadsr.control_attack)+512;
+        sp->stadsr.attack = read_potentiometer_value(sp->stadsr.control_attack)*2+512;
     su->stadsr.rise_slope = (ADSR_SLOPE_SCALING * su->stadsr.max_amp_level) / sp->stadsr.attack;
     if (sp->stadsr.control_decay != 0)
-        sp->stadsr.decay = read_potentiometer_value(sp->stadsr.control_decay)+512;
+        sp->stadsr.decay = read_potentiometer_value(sp->stadsr.control_decay)*2+512;
     su->stadsr.decay_slope = (ADSR_SLOPE_SCALING * (su->stadsr.max_amp_level - su->stadsr.sustain_amp_level)) / sp->stadsr.decay;
     if (sp->stadsr.control_release != 0)
-        sp->stadsr.release = read_potentiometer_value(sp->stadsr.control_release)+512;
+        sp->stadsr.release = read_potentiometer_value(sp->stadsr.control_release)*2+512;
     su->stadsr.release_slope = (ADSR_SLOPE_SCALING * su->stadsr.sustain_amp_level) / sp->stadsr.release;
-    su->stadsr.sample_ptr = &synth_unit_result[note][sp->stadsr.source_unit-1];
+    su->stadsr.sample_ptr = &synth_unit_result[sst->note][sp->stadsr.source_unit-1];
+    su->stadsr.note = sst->note;
 }
 
 const synth_parm_configuration_entry synth_parm_configuration_entry_adsr[] = 
 {
     { "SourceUnit",  offsetof(synth_parm_adsr,source_unit),           4, 2, 1, MAX_SYNTH_UNITS, NULL },
     { "ControlUnit", offsetof(synth_parm_adsr,control_unit),          4, 2, 1, MAX_SYNTH_UNITS, NULL },
-    { "Attack",      offsetof(synth_parm_adsr,attack),                4, 5, 512, DSP_SAMPLERATE, NULL },
-    { "Decay",       offsetof(synth_parm_adsr,decay),                 4, 5, 512, DSP_SAMPLERATE, NULL },
+    { "Attack",      offsetof(synth_parm_adsr,attack),                4, 5, 512, DSP_SAMPLERATE*2, NULL },
+    { "Decay",       offsetof(synth_parm_adsr,decay),                 4, 5, 512, DSP_SAMPLERATE*2, NULL },
     { "SustainLvl",  offsetof(synth_parm_adsr,sustain_level),         4, 3, 0, 255, NULL },
-    { "Release",     offsetof(synth_parm_adsr,release),               4, 5, 512, DSP_SAMPLERATE, NULL },
+    { "Release",     offsetof(synth_parm_adsr,release),               4, 5, 512, DSP_SAMPLERATE*2, NULL },
     { "OutputType",  offsetof(synth_parm_adsr,output_type),           4, 1, 0, 2, NULL },
     { "AttackCtl",   offsetof(synth_parm_adsr,control_attack),        4, 2, 0, POTENTIOMETER_MAX, "AttackCtl" },
     { "DecayCtl",    offsetof(synth_parm_adsr,control_decay),         4, 2, 0, POTENTIOMETER_MAX, "DecayCtl" },
@@ -246,9 +247,9 @@ const synth_parm_adsr synth_parm_adsr_default = { 0, 0, 0,  2000, 4000, 128, 200
 /**************************** SYNTH_TYPE_LOWPASS **************************************************/
 
 #ifdef PLACE_IN_RAM
-static int32_t __no_inline_not_in_flash_func(synth_type_process_lowpass)(synth_parm *sp, synth_unit *su, int note)
+static int32_t __no_inline_not_in_flash_func(synth_type_process_lowpass)(synth_parm *sp, synth_unit *su)
 #else
-int32_t synth_type_process_lowpass(synth_parm *sp, synth_unit *su, int note)
+int32_t synth_type_process_lowpass(synth_parm *sp, synth_unit *su)
 #endif
 {
     int32_t dalpha = su->stlp.dalpha + (((int32_t)(*su->stlp.control_ptr))*((int32_t)sp->stlp.control_gain))/256;
@@ -262,19 +263,19 @@ int32_t synth_type_process_lowpass(synth_parm *sp, synth_unit *su, int note)
     return sample;
 }
 
-void synth_note_start_lowpass(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t velocity, int note)
+void synth_note_start_lowpass(synth_parm *sp, synth_unit *su, synth_start_st *sst)
 {
     if (sp->stlp.control_kneefreq != 0)
         sp->stlp.kneefreq = read_potentiometer_value(sp->stlp.control_kneefreq)/(POT_MAX_VALUE/256);
 
     float b = ((float)sp->stlp.kneefreq) * (1.0f/256.0f);
-    float c0 = cosf(sp->stlp.frequency == 0 ? frequency_omega_from_vco(vco) : ((float)sp->stlp.frequency)*((float)(MATH_PI_F*2.0f/((float)DSP_SAMPLERATE))));
+    float c0 = cosf(sp->stlp.frequency == 0 ? frequency_omega_from_vco(sst->vco) : ((float)sp->stlp.frequency)*((float)(MATH_PI_F*2.0f/((float)DSP_SAMPLERATE))));
     float lbw = 1.0f-b*c0;
     float lb = 1.0f-b;
     float a = (lbw-sqrtf(lbw*lbw-lb*lb)) / lb;
     su->stlp.dalpha = (QUANTIZATION_MAX-1) -  ((int32_t) (a * QUANTIZATION_MAX));  
-    su->stlp.sample_ptr = &synth_unit_result[note][sp->stlp.source_unit-1];
-    su->stlp.control_ptr = &synth_unit_result[note][sp->stlp.control_unit-1];
+    su->stlp.sample_ptr = &synth_unit_result[sst->note][sp->stlp.source_unit-1];
+    su->stlp.control_ptr = &synth_unit_result[sst->note][sp->stlp.control_unit-1];
     su->stlp.feedback_ptr = &su->stlp.stage_y[sp->stlp.stages-1];
 }
 
@@ -296,9 +297,9 @@ const synth_parm_lowpass synth_parm_lowpass_default = { 0, 0, 0, 192, 4, 0, 0, 2
 /**************************** SYNTH_TYPE_OSC **************************************************/
 
 #ifdef PLACE_IN_RAM
-static int32_t __no_inline_not_in_flash_func(synth_type_process_osc)(synth_parm *sp, synth_unit *su, int note)
+static int32_t __no_inline_not_in_flash_func(synth_type_process_osc)(synth_parm *sp, synth_unit *su)
 #else
-int32_t synth_type_process_osc(synth_parm *sp, synth_unit *su, int note)
+int32_t synth_type_process_osc(synth_parm *sp, synth_unit *su)
 #endif
 {
     int32_t sample;
@@ -318,7 +319,7 @@ int32_t synth_type_process_osc(synth_parm *sp, synth_unit *su, int note)
 
 const float osc_scaling = logf( OSC_MAXFREQ / OSC_MINFREQ ) / ((float)POT_MAX_VALUE);
 
-void synth_note_start_osc(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t velocity, int note)
+void synth_note_start_osc(synth_parm *sp, synth_unit *su, synth_start_st *sst)
 {
     if (sp->stosc.control_amplitude != 0)
         sp->stosc.amplitude = read_potentiometer_value(sp->stosc.control_amplitude)/(POT_MAX_VALUE/256);
@@ -334,7 +335,7 @@ void synth_note_start_osc(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t
     su->stosc.counter_semitone_control_gain = f * sp->stosc.control_gain;
     su->stosc.counter_semitone_bend_gain = f * sp->stosc.bend_gain;
     su->stosc.wave = wavetables[sp->stosc.osc_type-1];
-    su->stosc.control_ptr = &synth_unit_result[note][sp->stosc.control_unit-1];
+    su->stosc.control_ptr = &synth_unit_result[sst->note][sp->stosc.control_unit-1];
 }
 
 const synth_parm_configuration_entry synth_parm_configuration_entry_osc[] = 
@@ -357,9 +358,9 @@ const synth_parm_osc synth_parm_osc_default = { 0, 0, 0, 1, 1, 6, 256, 0, 1, 0, 
 /**************************** SYNTH_TYPE_VCA **************************************************/
 
 #ifdef PLACE_IN_RAM
-static int32_t __no_inline_not_in_flash_func(synth_type_process_vca)(synth_parm *sp, synth_unit *su, int note)
+static int32_t __no_inline_not_in_flash_func(synth_type_process_vca)(synth_parm *sp, synth_unit *su)
 #else
-int32_t synth_type_process_vca(synth_parm *sp, synth_unit *su, int note)
+int32_t synth_type_process_vca(synth_parm *sp, synth_unit *su)
 #endif
 {
     int32_t control = ((*su->stvca.control_ptr) * ((int32_t)sp->stvca.control_gain)) / 256;
@@ -370,12 +371,12 @@ int32_t synth_type_process_vca(synth_parm *sp, synth_unit *su, int note)
     return sample;
 }
 
-void synth_note_start_vca(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t velocity, int note)
+void synth_note_start_vca(synth_parm *sp, synth_unit *su, synth_start_st *sst)
 {
     if (sp->stvca.control_amplitude != 0)
         sp->stvca.amplitude = read_potentiometer_value(sp->stvca.control_amplitude)/(POT_MAX_VALUE/256);
-    su->stvca.sample_ptr = &synth_unit_result[note][sp->stvca.source_unit-1];
-    su->stvca.control_ptr = &synth_unit_result[note][sp->stvca.control_unit-1];
+    su->stvca.sample_ptr = &synth_unit_result[sst->note][sp->stvca.source_unit-1];
+    su->stvca.control_ptr = &synth_unit_result[sst->note][sp->stvca.control_unit-1];
 }
 
 const synth_parm_configuration_entry synth_parm_configuration_entry_vca[] = 
@@ -393,9 +394,9 @@ const synth_parm_vca synth_parm_vca_default = { 0, 0, 0, 256, 64, 0 };
 /**************************** SYNTH_TYPE_MIXER **************************************************/
 
 #ifdef PLACE_IN_RAM
-static int32_t __no_inline_not_in_flash_func(synth_type_process_mixer)(synth_parm *sp, synth_unit *su, int note)
+static int32_t __no_inline_not_in_flash_func(synth_type_process_mixer)(synth_parm *sp, synth_unit *su)
 #else
-int32_t synth_type_process_mixer(synth_parm *sp, synth_unit *su, int note)
+int32_t synth_type_process_mixer(synth_parm *sp, synth_unit *su)
 #endif
 {
     int32_t control = ((*su->stmixer.control_ptr) * ((int32_t)sp->stmixer.control_gain)) / 256;
@@ -407,15 +408,15 @@ int32_t synth_type_process_mixer(synth_parm *sp, synth_unit *su, int note)
     return sample;
 }
 
-void synth_note_start_mixer(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t velocity, int note)
+void synth_note_start_mixer(synth_parm *sp, synth_unit *su, synth_start_st *sst)
 {
     if (sp->stmixer.control_mixval != 0)
         sp->stmixer.mixval = read_potentiometer_value(sp->stmixer.control_mixval)/(POT_MAX_VALUE/256);
     if (sp->stmixer.control_amplitude != 0)
         sp->stmixer.amplitude = read_potentiometer_value(sp->stmixer.control_amplitude)/(POT_MAX_VALUE/256);
-    su->stmixer.sample_ptr = &synth_unit_result[note][sp->stmixer.source_unit-1];
-    su->stmixer.sample2_ptr = &synth_unit_result[note][sp->stmixer.source2_unit-1];
-    su->stmixer.control_ptr = &synth_unit_result[note][sp->stmixer.control_unit-1];
+    su->stmixer.sample_ptr = &synth_unit_result[sst->note][sp->stmixer.source_unit-1];
+    su->stmixer.sample2_ptr = &synth_unit_result[sst->note][sp->stmixer.source2_unit-1];
+    su->stmixer.control_ptr = &synth_unit_result[sst->note][sp->stmixer.control_unit-1];
 }
 
 const synth_parm_configuration_entry synth_parm_configuration_entry_mixer[] = 
@@ -436,9 +437,9 @@ const synth_parm_mixer synth_parm_mixer_default = { 0, 0, 0, 1, 128, 256, 0, 0, 
 /**************************** SYNTH_TYPE_RING **************************************************/
 
 #ifdef PLACE_IN_RAM
-static int32_t __no_inline_not_in_flash_func(synth_type_process_ring)(synth_parm *sp, synth_unit *su, int note)
+static int32_t __no_inline_not_in_flash_func(synth_type_process_ring)(synth_parm *sp, synth_unit *su)
 #else
-int32_t synth_type_process_ring(synth_parm *sp, synth_unit *su, int note)
+int32_t synth_type_process_ring(synth_parm *sp, synth_unit *su)
 #endif
 {
     int32_t sample = ((*su->string.sample_ptr) * (*su->string.control_ptr)) / QUANTIZATION_MAX;
@@ -446,12 +447,12 @@ int32_t synth_type_process_ring(synth_parm *sp, synth_unit *su, int note)
     return sample;
 }
 
-void synth_note_start_ring(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t velocity, int note)
+void synth_note_start_ring(synth_parm *sp, synth_unit *su, synth_start_st *sst)
 {
     if (sp->string.control_amplitude != 0)
         sp->string.amplitude = read_potentiometer_value(sp->string.control_amplitude)/(POT_MAX_VALUE/256);
-    su->string.sample_ptr = &synth_unit_result[note][sp->string.source_unit-1];
-    su->string.control_ptr = &synth_unit_result[note][sp->string.control_unit-1];
+    su->string.sample_ptr = &synth_unit_result[sst->note][sp->string.source_unit-1];
+    su->string.control_ptr = &synth_unit_result[sst->note][sp->string.control_unit-1];
 }
 
 const synth_parm_configuration_entry synth_parm_configuration_entry_ring[] = 
@@ -468,9 +469,9 @@ const synth_parm_ring synth_parm_ring_default = { 0, 0, 0, 256, 0 };
 /**************************** SYNTH_TYPE_NOISE **************************************************/
 
 #ifdef PLACE_IN_RAM
-static int32_t __no_inline_not_in_flash_func(synth_type_process_noise)(synth_parm *sp, synth_unit *su, int note)
+static int32_t __no_inline_not_in_flash_func(synth_type_process_noise)(synth_parm *sp, synth_unit *su)
 #else
-int32_t synth_type_process_noise(synth_parm *sp, synth_unit *su, int note)
+int32_t synth_type_process_noise(synth_parm *sp, synth_unit *su)
 #endif
 {
     su->stnoise.counter += (su->stnoise.counter_inc + ((su->stnoise.counter_semitone_control_gain*(*su->stnoise.control_ptr / 64) + 
@@ -484,13 +485,14 @@ int32_t synth_type_process_noise(synth_parm *sp, synth_unit *su, int note)
     return (su->stnoise.sample * ((int32_t)sp->stnoise.amplitude)) / 256;
 }
 
-void synth_note_start_noise(synth_parm *sp, synth_unit *su, uint32_t vco, uint32_t velocity, int note)
+void synth_note_start_noise(synth_parm *sp, synth_unit *su, synth_start_st *sst)
 {
     if (sp->stnoise.control_amplitude != 0)
         sp->stnoise.amplitude = read_potentiometer_value(sp->stnoise.control_amplitude)/(POT_MAX_VALUE/256);
     if (sp->stnoise.control_control_gain != 0)
         sp->stnoise.control_gain = read_potentiometer_value(sp->stnoise.control_control_gain)/(POT_MAX_VALUE/64);
-
+  
+    uint32_t vco = sst->vco;
     if (sp->stnoise.shiftup != 1)
     {
         vco += ((QUANTIZATION_MAX/MIDI_NOTES)*6)*sp->stnoise.shiftup;
@@ -501,7 +503,7 @@ void synth_note_start_noise(synth_parm *sp, synth_unit *su, uint32_t vco, uint32
     float f = counter_inc_float * SEMITONE_LOG_STEP;
     su->stnoise.counter_semitone_control_gain = f * sp->stnoise.control_gain;
     su->stnoise.counter_semitone_pitch_bend_gain = f * sp->stnoise.pitch_bend_gain;
-    su->stnoise.control_ptr = &synth_unit_result[note][sp->stnoise.control_unit-1];
+    su->stnoise.control_ptr = &synth_unit_result[sst->note][sp->stnoise.control_unit-1];
 }
 
 const synth_parm_configuration_entry synth_parm_configuration_entry_noise[] = 
@@ -672,9 +674,9 @@ void synth_unit_initialize(int synth_unit_number, synth_unit_type sut)
     DMB();
 }
 
-static inline int32_t synth_process(synth_parm *sp, synth_unit *su, int note)
+static inline int32_t synth_process(synth_parm *sp, synth_unit *su)
 {
-    return stp[(int)sp->stn.sut](sp, su, note);
+    return stp[(int)sp->stn.sut](sp, su);
 }
 
 void synth_start_note_val(uint8_t note_no, uint8_t velocity, int note)
@@ -683,9 +685,14 @@ void synth_start_note_val(uint8_t note_no, uint8_t velocity, int note)
     synth_unit *su = synth_unit_entry(note, 0);
     memset(su,'\000',sizeof(synth_unit)*MAX_SYNTH_UNITS);
     synth_parm *sp = synth_parm_entry(0);
+    synth_start_st sst;
+    sst.note_no = note_no;
+    sst.vco = vco;
+    sst.velocity = velocity;
+    sst.note = note;
     for (int unit_no=0;unit_no<MAX_SYNTH_UNITS;unit_no++)
     {
-        sns[(int)sp->stn.sut](sp, su, vco, velocity, note);
+        sns[(int)sp->stn.sut](sp, su, &sst);
         su++;
         sp++;
     }
@@ -812,7 +819,7 @@ int32_t synth_local_process_all_units(void)
             synth_unit *su = synth_units[note];
             for (int unit_no=0;unit_no<MAX_SYNTH_UNITS;unit_no++)
             {
-                sur[unit_no+1] = (sp->stn.sut == 0) ? sur[sp->stn.source_unit-1] : synth_process(sp, su, note);
+                sur[unit_no+1] = (sp->stn.sut == 0) ? sur[sp->stn.source_unit-1] : synth_process(sp, su);
                 sp++;
                 su++;
             }
