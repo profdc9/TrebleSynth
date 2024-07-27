@@ -428,6 +428,14 @@ void manually_poll_analog_controls(void)
    select_control(0,0);
 }
 
+void reset_control_sample(uint n, uint16_t last_sample)
+{
+   last_samples[n] = last_sample;
+   control_enabled[n] = false;
+   control_direction[n] = current_samples[n] < last_sample;
+   samples[n] = last_sample;
+}
+
 void reset_control_samples(uint16_t *reset_samples)
 {
     memset(sample_changed,'\000',sizeof(sample_changed));
@@ -447,11 +455,7 @@ void reset_control_samples(uint16_t *reset_samples)
     }
     manually_poll_analog_controls();
     for (uint n=0;n<NUMBER_OF_CONTROLS;n++)
-    {
-        control_enabled[n] = false;
-        control_direction[n] = current_samples[n] < last_samples[n];
-        samples[n] = last_samples[n];
-    }
+        reset_control_sample(n, last_samples[n]);
 }
 
 #ifdef PLACE_IN_RAM
@@ -1575,6 +1579,39 @@ int getdesc_cmd(int args, tinycl_parameter* tp, void *v)
   return 1;
 }
 
+int pset_cmd(int args, tinycl_parameter *tp, void *v)
+{
+  uint n=tp[0].ti.i;
+  uint val=tp[1].ti.i;
+  
+  if ((n >= 1) && (n <= NUMBER_OF_CONTROLS))
+  {
+    reset_control_sample(n-1, val);
+    tinycl_put_string("PSET\r\n");
+  }
+  return 1;
+}
+
+int pget_cmd(int args, tinycl_parameter *tp, void *V)
+{
+  uint n=tp[0].ti.i;
+  char s[80];
+  
+  if ((n == 0) || (n > NUMBER_OF_CONTROLS))
+  {
+    for (n=0;n<NUMBER_OF_CONTROLS;n++)
+    {
+        sprintf(s,"PSET %u %u\r\n ", n+1, samples[n]);
+        tinycl_put_string(s);
+    }
+  } else
+  {
+    sprintf(s,"PSET %u %u\r\n ", n, samples[n-1]);
+    tinycl_put_string(s);
+  }
+  return 1;
+}
+
 int help_cmd(int args, tinycl_parameter *tp, void *v);
 
 const tinycl_command tcmds[] =
@@ -1593,6 +1630,8 @@ const tinycl_command tcmds[] =
   { "SCONF", "Get synth configuration list", sconf_cmd, TINYCL_PARM_INT, TINYCL_PARM_INT, TINYCL_PARM_END },
   { "SINIT", "Set synth type", sinit_cmd, TINYCL_PARM_INT, TINYCL_PARM_INT, TINYCL_PARM_END },
   { "STYPE", "Get synth type", stype_cmd, TINYCL_PARM_INT, TINYCL_PARM_END },
+  { "PSET",  "Potentiometer Set", pset_cmd, TINYCL_PARM_INT, TINYCL_PARM_INT, TINYCL_PARM_END },
+  { "PGET",  "Potentiometer Get", pget_cmd, TINYCL_PARM_INT, TINYCL_PARM_END },
   { "TEST", "Test", test_cmd, TINYCL_PARM_INT, TINYCL_PARM_END },
   { "HELP", "Display This Help", help_cmd, {TINYCL_PARM_END } }
 };
@@ -1601,60 +1640,6 @@ int help_cmd(int args, tinycl_parameter *tp, void *v)
 {
   tinycl_print_commands(sizeof(tcmds) / sizeof(tinycl_command), tcmds);
   return 1;
-}
-
-void test_analog_controls(void)
-{
-   char s[100];
-   for (;;)
-   {
-    manually_poll_analog_controls();
-    clear_display();
-    for (int r=0;r<7;r++)
-    {
-        sprintf(s,"%04d %04d %04d",current_samples[r*3+1],current_samples[r*3+2],current_samples[r*3+3]);
-        write_str(0,r,s);
-    }
-    sprintf(s,"%d",counter);
-    write_str(0,7,s);
-    display_refresh();    
-    idle_task();
-   }
-}
-
-void test_analog_controls_sticky(void)
-{
-   char s[100];
-   for (;;)
-   {
-    clear_display();
-    for (int r=0;r<7;r++)
-    {
-        sprintf(s,"%05d%05d%05d",read_potentiometer_value(r*3+4),read_potentiometer_value(r*3+5),read_potentiometer_value(r*3+6));
-        write_str(0,r,s);
-    }
-    sprintf(s,"%d",counter);
-    write_str(0,7,s);
-    display_refresh();    
-    idle_task();
-   }
-}
-
-void test_controls(void)
-{
-   char s[20];
-   for (;;)
-   {
-    clear_display();
-    for (int a=0;a<32;a++)
-        write_str(a & 7, a / 8, button_state[a] ? "1" : "0");
-    for (int a=0;a<8;a++)
-        write_str(a & 7, 4, get_scan_button(a) ? "1" : "0");
-    sprintf(s,"%d",counter);
-    write_str(0,7,s);
-    display_refresh();    
-    idle_task();
-   }
 }
 
 const char *const confmenu[] = {"Quit", "Transpose", "FailDelay", NULL };
@@ -1785,8 +1770,6 @@ int main()
     flash_load_most_recent();
     start_synth_engine();
     
-    //test_analog_controls();
-    //test_analog_controls_sticky();
     for (;;)
     {
         clear_display();

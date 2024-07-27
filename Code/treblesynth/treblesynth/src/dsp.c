@@ -172,7 +172,7 @@ int32_t dsp_type_process_noisegate(int32_t sample, dsp_parm *dp, dsp_unit *du)
 const dsp_parm_configuration_entry dsp_parm_configuration_entry_noisegate[] = 
 {
     { "Threshold",       offsetof(dsp_parm_noisegate,threshold),           4, 5, 1, ADC_PREC_VALUE/2, NULL},
-    { "Response",        offsetof(dsp_parm_noisegate,response),            4, 1, 1, 3, NULL, NULL },
+    { "Response",        offsetof(dsp_parm_noisegate,response),            4, 1, 1, 3, NULL },
     { "ThresholdCtrl",   offsetof(dsp_parm_noisegate,control_number1),     4, 2, 0, POTENTIOMETER_MAX, "NoiseThr" },
     { "SourceUnit", offsetof(dsp_parm_noisegate,source_unit),     4, 2, 1, MAX_DSP_UNITS, NULL },
     { NULL, 0, 4, 0, 0,   1, NULL    }

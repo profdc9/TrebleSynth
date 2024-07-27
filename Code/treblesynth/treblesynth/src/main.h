@@ -33,7 +33,6 @@ uint8_t get_scan_button(uint8_t b);
 int uart0_input(void);
 void uart0_output(const uint8_t *data, int num);
 void idle_task(void);
-void set_debug_vals(int32_t v1, int32_t v2, int32_t v3);
 
 #ifdef __cplusplus
 }
