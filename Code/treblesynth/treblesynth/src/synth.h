@@ -41,6 +41,7 @@ extern "C"
 #define MAX_SYNTH_UNITS 10
 #define SYNTH_OSCILLATOR_PRECISION 256
 #define SYNTH_STOPPING_COUNTER 256
+#define SYNTH_PERIOD_PRECISION 256
 
 typedef enum 
 {
@@ -52,6 +53,7 @@ typedef enum
     SYNTH_TYPE_VCA,
     SYNTH_TYPE_MIXER,
     SYNTH_TYPE_RING,
+    SYNTH_TYPE_VDO,
     SYNTH_TYPE_NOISE,
     SYNTH_TYPE_MAX_ENTRY
 } synth_unit_type;
@@ -226,6 +228,31 @@ typedef struct
     synth_unit_type sut;
     uint32_t source_unit;
     uint32_t control_unit;
+    uint32_t osc_type;
+    int32_t  control_gain;
+    int32_t  amplitude;
+    uint32_t detune;
+    uint32_t phase;
+    uint32_t control_control_gain;
+    uint32_t pitch_bend_gain;
+} synth_parm_vdo;
+
+typedef struct
+{
+    uint32_t counter;
+    int32_t  phase;
+    int32_t  phase_inc;
+    int32_t  phase_mul;
+    int32_t  period;
+    int32_t  period_semitone_pitch_bend_gain;
+    int32_t  *control_ptr;
+} synth_type_vdo;    
+
+typedef struct
+{
+    synth_unit_type sut;
+    uint32_t source_unit;
+    uint32_t control_unit;
     int32_t  control_gain;
     int32_t  amplitude;
     int32_t  shiftup;
@@ -256,6 +283,7 @@ typedef union
     synth_type_vca          stvca;
     synth_type_mixer        stmixer;
     synth_type_ring         string;
+    synth_type_vdo          stvdo;
     synth_type_noise        stnoise;
 } synth_unit;
 
@@ -269,6 +297,7 @@ typedef union
     synth_parm_vca          stvca;
     synth_parm_mixer        stmixer;
     synth_parm_ring         string;
+    synth_parm_vdo          stvdo;
     synth_parm_noise        stnoise;
 } synth_parm;
 

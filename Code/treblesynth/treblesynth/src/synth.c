@@ -73,6 +73,19 @@ inline float counter_fraction_from_vco(uint32_t vco)
     return expf((SEMITONE_LOG_STEP*((float)MIDI_NOTES)/((float)QUANTIZATION_MAX))*((float)vco))*((MIDI_FREQUENCY_0/((float)DSP_SAMPLERATE))*((((float)SYNTH_OSCILLATOR_PRECISION)*WAVETABLES_LENGTH)));
 }
 
+inline float period_count_from_vco(uint32_t vco)
+{
+    return expf((-SEMITONE_LOG_STEP*((float)MIDI_NOTES)/((float)QUANTIZATION_MAX))*((float)vco))*((((float)DSP_SAMPLERATE)/MIDI_FREQUENCY_0)*((float)SYNTH_PERIOD_PRECISION));
+}
+
+const int32_t harmonic_addition[7] = { 0, (int32_t) (12.0f*(QUANTIZATION_MAX/MIDI_NOTES)),
+                                       (int32_t) (19.01955f*(QUANTIZATION_MAX/MIDI_NOTES)),
+                                       (int32_t) (24.0f*(QUANTIZATION_MAX/MIDI_NOTES)),
+                                       (int32_t) (27.863137f*(QUANTIZATION_MAX/MIDI_NOTES)),
+                                       (int32_t) (31.01955f*(QUANTIZATION_MAX/MIDI_NOTES)),
+                                       (int32_t) (33.688259f*(QUANTIZATION_MAX/MIDI_NOTES)) };
+
+
 /**************************** SYNTH_TYPE_NONE **************************************************/
 
 #ifdef PLACE_IN_RAM
@@ -113,13 +126,6 @@ int32_t synth_type_process_vco(synth_parm *sp, synth_unit *su)
     return sample;
 }
 
-const int32_t harmonic_addition[7] = { 0, (int32_t) (12.0f*(QUANTIZATION_MAX/MIDI_NOTES)),
-                                       (int32_t) (19.01955f*(QUANTIZATION_MAX/MIDI_NOTES)),
-                                       (int32_t) (24.0f*(QUANTIZATION_MAX/MIDI_NOTES)),
-                                       (int32_t) (27.863137f*(QUANTIZATION_MAX/MIDI_NOTES)),
-                                       (int32_t) (31.01955f*(QUANTIZATION_MAX/MIDI_NOTES)),
-                                       (int32_t) (33.688259f*(QUANTIZATION_MAX/MIDI_NOTES)) };
-
 void synth_note_start_vco(synth_parm *sp, synth_unit *su, synth_start_st *sst)
 {
     if (sp->stvco.control_amplitude != 0)
@@ -127,9 +133,7 @@ void synth_note_start_vco(synth_parm *sp, synth_unit *su, synth_start_st *sst)
     if (sp->stvco.control_control_gain != 0)
         sp->stvco.control_gain = read_potentiometer_value(sp->stvco.control_control_gain)/(POT_MAX_VALUE/64);
 
-    int32_t vco = sst->vco + (sp->stvco.detune - 4096);
-    if (sp->stvco.harmonic != 1)
-        vco += harmonic_addition[sp->stvco.harmonic-1];
+    int32_t vco = sst->vco + (sp->stvco.detune - 4096) + harmonic_addition[sp->stvco.harmonic-1];
     while (vco > (QUANTIZATION_MAX-1)) vco -= ((QUANTIZATION_MAX/MIDI_NOTES)*12);
     while (vco < 0) vco += ((QUANTIZATION_MAX/MIDI_NOTES)*12);
     float counter_inc_float = counter_fraction_from_vco(((uint32_t)vco));
@@ -466,6 +470,71 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_ring[] =
 
 const synth_parm_ring synth_parm_ring_default = { 0, 0, 0, 256, 0 };
 
+/**************************** SYNTH_TYPE_VDO **************************************************/
+
+#ifdef PLACE_IN_RAM
+static int32_t __no_inline_not_in_flash_func(synth_type_process_vdo)(synth_parm *sp, synth_unit *su)
+#else
+int32_t synth_type_process_vdo(synth_parm *sp, synth_unit *su)
+#endif
+{
+    int32_t sample;
+    
+    int32_t period = (su->stvdo.period - ((su->stvdo.period_semitone_pitch_bend_gain * (synth_pitch_bend_value /64))/(QUANTIZATION_MAX/64)));
+    
+    int32_t phase = su->stvdo.phase_mul + (((*su->stvdo.control_ptr)*(sp->stvdo.control_gain))/(QUANTIZATION_MAX*64/2048));
+    if (phase < 0) phase = 0;
+    else if (phase > 1023) phase = 1023;
+    
+    su->stvdo.counter += SYNTH_PERIOD_PRECISION;
+    if (su->stvdo.counter > period)
+    {
+        su->stvdo.counter -= period;
+        su->stvdo.phase = QUANTIZATION_MAX-1;
+    }
+    
+    if (su->stvdo.phase > 0)
+    {
+       su->stvdo.phase -= (su->stvdo.phase_inc * phase) / 1024;
+       sample = (sp->stvdo.osc_type == 1) ? QUANTIZATION_MAX - 1 : su->stvdo.phase;
+    } else sample = 0;
+    sample = (sample * ((int32_t)sp->stvdo.amplitude)) / 256;
+    return sample;
+}
+
+void synth_note_start_vdo(synth_parm *sp, synth_unit *su, synth_start_st *sst)
+{
+    if (sp->stvdo.control_control_gain != 0)
+        sp->stvdo.control_gain = read_potentiometer_value(sp->stvdo.control_control_gain)/(POT_MAX_VALUE/64);
+
+    int32_t vco = sst->vco + (sp->stvdo.detune - 4096);
+    while (vco > (QUANTIZATION_MAX-1)) vco -= ((QUANTIZATION_MAX/MIDI_NOTES)*12);
+    while (vco < 0) vco += ((QUANTIZATION_MAX/MIDI_NOTES)*12);
+    float period_float = period_count_from_vco((uint32_t)vco);
+    su->stvdo.period = period_float;
+    su->stvdo.period_semitone_pitch_bend_gain = (period_float * SEMITONE_LOG_STEP) * sp->stvdo.pitch_bend_gain;
+    su->stvdo.phase_inc = (((float)(QUANTIZATION_MAX*16))*((float)SYNTH_PERIOD_PRECISION)) / period_float;
+    su->stvdo.control_ptr = &synth_unit_result[sst->note][sp->stvdo.control_unit-1];
+    su->stvdo.phase = QUANTIZATION_MAX-1;
+    su->stvdo.phase_mul = sp->stvdo.phase*8;
+}
+
+const synth_parm_configuration_entry synth_parm_configuration_entry_vdo[] = 
+{
+    { "SourceUnit",  offsetof(synth_parm_vdo,source_unit),           4, 2, 1, MAX_SYNTH_UNITS, NULL },
+    { "ControlUnit", offsetof(synth_parm_vdo,control_unit),          4, 2, 1, MAX_SYNTH_UNITS, NULL },
+    { "OscType",     offsetof(synth_parm_vdo,osc_type),              4, 1, 1, 2, NULL },
+    { "Amplitude",   offsetof(synth_parm_vdo,amplitude),             4, 3, 0, 256, NULL },        
+    { "Detune",      offsetof(synth_parm_vdo,detune),                4, 4, 0, 8191, NULL },
+    { "Phase",       offsetof(synth_parm_vdo,phase),                 3, 3, 0, 255, NULL },
+    { "ControlGain", offsetof(synth_parm_vdo,control_gain),          4, 2, 0, 63, NULL },
+    { "BendGain",    offsetof(synth_parm_vdo,pitch_bend_gain),       4, 2, 0, 63, NULL },
+    { "GainCtrl",    offsetof(synth_parm_vdo,control_control_gain),  4, 2, 0, POTENTIOMETER_MAX, "VCOGain" },
+    { NULL, 0, 4, 0, 0,   1, NULL    }
+};
+
+const synth_parm_vdo synth_parm_vdo_default = { 0, 0, 0, 1, 1, 256, 4096, 128, 0, 0 };
+
 /**************************** SYNTH_TYPE_NOISE **************************************************/
 
 #ifdef PLACE_IN_RAM
@@ -533,6 +602,7 @@ const char * const stnames[] =
     "VCA",
     "Mixer",
     "Ring",
+    "VDO",
     "Noise",
     NULL
 };
@@ -547,6 +617,7 @@ const synth_parm_configuration_entry * const spce[] =
     synth_parm_configuration_entry_vca,
     synth_parm_configuration_entry_mixer,
     synth_parm_configuration_entry_ring,
+    synth_parm_configuration_entry_vdo,
     synth_parm_configuration_entry_noise,
     NULL
 };
@@ -560,6 +631,7 @@ synth_type_process * const stp[] = {
     synth_type_process_vca,
     synth_type_process_mixer,
     synth_type_process_ring,
+    synth_type_process_vdo,
     synth_type_process_noise,
 };
 
@@ -573,6 +645,7 @@ synth_note_start * const sns[] =
     synth_note_start_vca,
     synth_note_start_mixer,
     synth_note_start_ring,
+    synth_note_start_vdo,
     synth_note_start_noise,
 };
 
@@ -586,6 +659,7 @@ const void * const synth_parm_struct_defaults[] =
     (void *) &synth_parm_vca_default,
     (void *) &synth_parm_mixer_default,
     (void *) &synth_parm_ring_default,
+    (void *) &synth_parm_vdo_default,
     (void *) &synth_parm_noise_default,
 };
 
