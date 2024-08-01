@@ -21,9 +21,10 @@ The type of modules that one can create are:
 3. VCF (Voltage Controlled Filter).  This is a up to four-pole lowpass filter modeled loosely on the 24 dB/octave Moog ladder filter.  It has an adjustable fixed frequency cutoff, or the frequency cutoff is determined by the note being played (frequency=0).
 4. LFO (Low Frequency Oscillator).  An oscillator with a frequency that does not depend on the note frequency.  This can be used, for example, to implement vibrato and tremolo effects when used to modulate other units.
 5. VCA (Voltage Controlled Amplifier).  A voltage controlled amplifier that uses the output of another module to modulate the gain.  Additional gain may be applied with a VCA as well.
-6. Mixer.  Can be used to combine the output signals of two modules.  For example, two separate VCO FM synthesis chains can be combined together.
+6. Mixer.  Can be used to combine the output signals of two modules.  For example, two separate VCO FM synthesis chains can be combined together.  The mixing fraction can be modulated (for example by LFO or ADSR).
 7. Ring.  A ring modulator where the signal from one module four-quadrant multiplies another module.
-8. Noise.  A noise source that can be used to create percussive effects.
+8. VDO (Variable Duty-Cycle Oscillator)  A square or sawtooth wave oscillator with a duty cycle that can be modulated (for example by an ADSR or LFO) to change the timbre.  The pitch can be modulated as well (for vibrato or chirp effects).
+9. Noise.  A noise source that can be used to create percussive effects.
 
 Up to 10 modules can be used at a time.  Subtractive and FM synthesis is possible with various configurations of the modules. It also includes these effect taken from the GuitarPico ( https://www.github.com/profdc9/GuitarPico ) project:
 

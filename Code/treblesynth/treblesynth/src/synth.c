@@ -160,7 +160,7 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_vco[] =
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
-const synth_parm_vco synth_parm_vco_default = { 0, 0, 0, 1, 1, 256, 1, 0, 0, 0, 4096 };
+const synth_parm_vco synth_parm_vco_default = { 0, 0, 0, 1, 1, 256, 1, 0, 0, 1, 4096 };
 
 /**************************** SYNTH_TYPE_ADSR **************************************************/
 
@@ -479,14 +479,16 @@ int32_t synth_type_process_vdo(synth_parm *sp, synth_unit *su)
 #endif
 {
     int32_t sample;
-    
-    int32_t period = (su->stvdo.period - ((su->stvdo.period_semitone_pitch_bend_gain * (synth_pitch_bend_value /64))/(QUANTIZATION_MAX/64)));
-    
+        
     int32_t phase = su->stvdo.phase_mul + (((*su->stvdo.control_ptr)*(sp->stvdo.control_gain))/(QUANTIZATION_MAX*64/2048));
-    if (phase < 0) phase = 0;
-    else if (phase > 1023) phase = 1023;
     
+    if (phase < 0) phase = 0;
+    if (phase > 1023) phase = 1023;
+
+    int32_t period = (su->stvdo.period - ((su->stvdo.period_semitone_pitch_bend_gain * (( (synth_pitch_bend_value + *su->stvdo.source_ptr)/64))) / (QUANTIZATION_MAX/64)));
+
     su->stvdo.counter += SYNTH_PERIOD_PRECISION;
+    
     if (su->stvdo.counter > period)
     {
         su->stvdo.counter -= period;
@@ -514,6 +516,7 @@ void synth_note_start_vdo(synth_parm *sp, synth_unit *su, synth_start_st *sst)
     su->stvdo.period = period_float;
     su->stvdo.period_semitone_pitch_bend_gain = (period_float * SEMITONE_LOG_STEP) * sp->stvdo.pitch_bend_gain;
     su->stvdo.phase_inc = (((float)(QUANTIZATION_MAX*16))*((float)SYNTH_PERIOD_PRECISION)) / period_float;
+    su->stvdo.source_ptr = &synth_unit_result[sst->note][sp->stvdo.source_unit-1];
     su->stvdo.control_ptr = &synth_unit_result[sst->note][sp->stvdo.control_unit-1];
     su->stvdo.phase = QUANTIZATION_MAX-1;
     su->stvdo.phase_mul = sp->stvdo.phase*8;
@@ -533,7 +536,7 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_vdo[] =
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
-const synth_parm_vdo synth_parm_vdo_default = { 0, 0, 0, 1, 1, 256, 4096, 128, 0, 0 };
+const synth_parm_vdo synth_parm_vdo_default = { 1, 0, 0, 1, 1, 256, 4096, 128, 0, 1 };
 
 /**************************** SYNTH_TYPE_NOISE **************************************************/
 
@@ -741,8 +744,10 @@ void synth_unit_initialize(int synth_unit_number, synth_unit_type sut)
     
     synth_unit_reset_unitno(synth_unit_number);
     memcpy((void *)sp, synth_parm_struct_defaults[sut], sizeof(synth_parm));
-    sp->stn.source_unit = synth_unit_number + 1;
-    sp->stn.control_unit = 1;
+    if (sp->stn.source_unit == 0)
+        sp->stn.source_unit = synth_unit_number + 1;
+    if (sp->stn.control_unit == 0)
+        sp->stn.control_unit = 1;
     DMB();
     sp->stn.sut = sut;
     DMB();

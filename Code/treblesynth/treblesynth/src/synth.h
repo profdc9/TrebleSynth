@@ -246,6 +246,7 @@ typedef struct
     int32_t  period;
     int32_t  period_semitone_pitch_bend_gain;
     int32_t  *control_ptr;
+    int32_t  *source_ptr;
 } synth_type_vdo;    
 
 typedef struct
