@@ -10,7 +10,7 @@
   arising from the use of this software.
 
   Permission is granted to anyone to use this software for any purpose,
-  including commercial applications, and to alter it and redistribute it
+33  including commercial applications, and to alter it and redistribute it
   freely, subject to the following restrictions:
 
   1. The origin of this software must not be misrepresented; you must not
@@ -28,6 +28,10 @@
 #define PLACE_IN_RAM
 
 #define POTENTIOMETER_MAX 23
+#define NUMBER_OF_CONTROLS 64
+#define NUMBER_OF_POT_CONTROLS 24
+#define NUMBER_OF_CC_CONTROLS (NUMBER_OF_CONTROLS - NUMBER_OF_POT_CONTROLS)
+#define CONTROL_VALUE_LENGTH 16
 
 #include "hardware/pio.h"
 #include "hardware/pwm.h"
@@ -79,7 +83,7 @@
 #define FLASH_PAGE_BYTES 4096u
 #define FLASH_OFFSET_STORED (2*1024*1024)
 #define FLASH_BASE_ADR 0x10000000
-#define FLASH_MAGIC_NUMBER 0xFEE1FEDA
+#define FLASH_MAGIC_NUMBER 0xFEE1AEDA
 
 #ifndef LED_PIN
 #define LED_PIN 25

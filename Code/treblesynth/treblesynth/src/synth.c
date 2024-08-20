@@ -155,8 +155,8 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_vco[] =
     { "Detune",      offsetof(synth_parm_vco,detune),                4, 4, 0, 8191, NULL },
     { "ControlGain", offsetof(synth_parm_vco,control_gain),          4, 2, 0, 63, NULL },
     { "BendGain",    offsetof(synth_parm_vco,pitch_bend_gain),       4, 2, 0, 63, NULL },
-    { "AmplCtrl",    offsetof(synth_parm_vco,control_amplitude),     4, 2, 0, POTENTIOMETER_MAX, "VCOAmpli" },
-    { "GainCtrl",    offsetof(synth_parm_vco,control_control_gain),  4, 2, 0, POTENTIOMETER_MAX, "VCOGain" },
+    { "AmplCtrl",    offsetof(synth_parm_vco,control_amplitude),     4, 2, 0, NUMBER_OF_CONTROLS, "VCOAmpli" },
+    { "GainCtrl",    offsetof(synth_parm_vco,control_control_gain),  4, 2, 0, NUMBER_OF_CONTROLS, "VCOGain" },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
@@ -239,10 +239,10 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_adsr[] =
     { "SustainLvl",  offsetof(synth_parm_adsr,sustain_level),         4, 3, 0, 255, NULL },
     { "Release",     offsetof(synth_parm_adsr,release),               4, 5, 512, DSP_SAMPLERATE*2, NULL },
     { "OutputType",  offsetof(synth_parm_adsr,output_type),           4, 1, 0, 2, NULL },
-    { "AttackCtl",   offsetof(synth_parm_adsr,control_attack),        4, 2, 0, POTENTIOMETER_MAX, "AttackCtl" },
-    { "DecayCtl",    offsetof(synth_parm_adsr,control_decay),         4, 2, 0, POTENTIOMETER_MAX, "DecayCtl" },
-    { "SustainCtl",  offsetof(synth_parm_adsr,control_sustain),       4, 2, 0, POTENTIOMETER_MAX, "SustainCtl" },
-    { "ReleaseCtl",  offsetof(synth_parm_adsr,control_release),       4, 2, 0, POTENTIOMETER_MAX, "ReleaseCtl" },
+    { "AttackCtl",   offsetof(synth_parm_adsr,control_attack),        4, 2, 0, NUMBER_OF_CONTROLS, "AttackCtl" },
+    { "DecayCtl",    offsetof(synth_parm_adsr,control_decay),         4, 2, 0, NUMBER_OF_CONTROLS, "DecayCtl" },
+    { "SustainCtl",  offsetof(synth_parm_adsr,control_sustain),       4, 2, 0, NUMBER_OF_CONTROLS, "SustainCtl" },
+    { "ReleaseCtl",  offsetof(synth_parm_adsr,control_release),       4, 2, 0, NUMBER_OF_CONTROLS, "ReleaseCtl" },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
@@ -292,7 +292,7 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_lowpass[] =
     { "Frequency",   offsetof(synth_parm_lowpass,frequency),          4, 4, 0, 4000, NULL },
     { "ControlGain", offsetof(synth_parm_lowpass,control_gain),       4, 3, 0, 255, NULL },
     { "Resonance",   offsetof(synth_parm_lowpass,resonance),          4, 3, 0, 255, NULL },
-    { "LPFreqCtrl",  offsetof(synth_parm_lowpass,control_kneefreq),   4, 2, 0, POTENTIOMETER_MAX, "LPFreq" },
+    { "LPFreqCtrl",  offsetof(synth_parm_lowpass,control_kneefreq),   4, 2, 0, NUMBER_OF_CONTROLS, "LPFreq" },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
@@ -351,9 +351,9 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_osc[] =
     { "OscType",     offsetof(synth_parm_osc,osc_type),           4, 2, 1, 8, NULL },
     { "ControlGain", offsetof(synth_parm_osc,control_gain),       4, 2, 0, 15, NULL },
     { "BendGain",    offsetof(synth_parm_osc,bend_gain),          4, 2, 0, 15, NULL },
-    { "BendCtrl",    offsetof(synth_parm_osc,control_bend),       4, 2, 0, POTENTIOMETER_MAX, "LFOFMGain" },
-    { "FreqCtrl",    offsetof(synth_parm_osc,control_frequency),  4, 2, 0, POTENTIOMETER_MAX, "LFOFreq" },
-    { "AmplCtrl",    offsetof(synth_parm_osc,control_amplitude),  4, 2, 0, POTENTIOMETER_MAX, "LFOAmpli" },
+    { "BendCtrl",    offsetof(synth_parm_osc,control_bend),       4, 2, 0, NUMBER_OF_CONTROLS, "LFOFMGain" },
+    { "FreqCtrl",    offsetof(synth_parm_osc,control_frequency),  4, 2, 0, NUMBER_OF_CONTROLS, "LFOFreq" },
+    { "AmplCtrl",    offsetof(synth_parm_osc,control_amplitude),  4, 2, 0, NUMBER_OF_CONTROLS, "LFOAmpli" },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
@@ -389,7 +389,7 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_vca[] =
     { "ControlUnit", offsetof(synth_parm_vca,control_unit),       4, 2, 1, MAX_SYNTH_UNITS, NULL },
     { "ControlGain", offsetof(synth_parm_vca,control_gain),       4, 3, 0, 256, NULL },
     { "Amplitude",   offsetof(synth_parm_vca,amplitude),          4, 3, 0, 256, NULL },        
-    { "AmplCtrl",    offsetof(synth_parm_vca,control_amplitude),  4, 2, 0, POTENTIOMETER_MAX, "VCAAmpli" },
+    { "AmplCtrl",    offsetof(synth_parm_vca,control_amplitude),  4, 2, 0, NUMBER_OF_CONTROLS, "VCAAmpli" },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
@@ -431,8 +431,8 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_mixer[] =
     { "Mixval",       offsetof(synth_parm_mixer,mixval),             4, 3, 0, 256, NULL },        
     { "Amplitude",    offsetof(synth_parm_mixer,amplitude),          4, 3, 0, 256, NULL },        
     { "ControlGain",  offsetof(synth_parm_mixer,control_gain),       4, 3, 0, 256, NULL },
-    { "MixCtrl",      offsetof(synth_parm_mixer,control_mixval),     4, 2, 0, POTENTIOMETER_MAX, "MixerBal" },
-    { "AmplCtrl",     offsetof(synth_parm_mixer,control_amplitude),  4, 2, 0, POTENTIOMETER_MAX, "MixerAmpli" },
+    { "MixCtrl",      offsetof(synth_parm_mixer,control_mixval),     4, 2, 0, NUMBER_OF_CONTROLS, "MixerBal" },
+    { "AmplCtrl",     offsetof(synth_parm_mixer,control_amplitude),  4, 2, 0, NUMBER_OF_CONTROLS, "MixerAmpli" },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
@@ -464,7 +464,7 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_ring[] =
     { "SourceUnit",  offsetof(synth_parm_ring,source_unit),        4, 2, 1, MAX_SYNTH_UNITS, NULL },
     { "ControlUnit", offsetof(synth_parm_ring,control_unit),       4, 2, 1, MAX_SYNTH_UNITS, NULL },
     { "Amplitude",   offsetof(synth_parm_ring,amplitude),          4, 3, 0, 256, NULL },        
-    { "AmplCtrl",    offsetof(synth_parm_ring,control_amplitude),  4, 2, 0, POTENTIOMETER_MAX, "RingAmpli" },
+    { "AmplCtrl",    offsetof(synth_parm_ring,control_amplitude),  4, 2, 0, NUMBER_OF_CONTROLS, "RingAmpli" },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
@@ -532,7 +532,7 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_vdo[] =
     { "Phase",       offsetof(synth_parm_vdo,phase),                 3, 3, 0, 255, NULL },
     { "ControlGain", offsetof(synth_parm_vdo,control_gain),          4, 2, 0, 63, NULL },
     { "BendGain",    offsetof(synth_parm_vdo,pitch_bend_gain),       4, 2, 0, 63, NULL },
-    { "GainCtrl",    offsetof(synth_parm_vdo,control_control_gain),  4, 2, 0, POTENTIOMETER_MAX, "VCOGain" },
+    { "GainCtrl",    offsetof(synth_parm_vdo,control_control_gain),  4, 2, 0, NUMBER_OF_CONTROLS, "VCOGain" },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
@@ -586,8 +586,8 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_noise[] =
     { "ShiftUp",     offsetof(synth_parm_noise,shiftup),               4, 2, 1, 20, NULL },        
     { "ControlGain", offsetof(synth_parm_noise,control_gain),          4, 2, 0, 63, NULL },
     { "BendGain",    offsetof(synth_parm_noise,pitch_bend_gain),       4, 2, 0, 63, NULL },
-    { "AmplCtrl",    offsetof(synth_parm_noise,control_amplitude),     4, 2, 0, POTENTIOMETER_MAX, "VCOAmpli" },
-    { "GainCtrl",    offsetof(synth_parm_noise,control_control_gain),  4, 2, 0, POTENTIOMETER_MAX, "VCOGain" },
+    { "AmplCtrl",    offsetof(synth_parm_noise,control_amplitude),     4, 2, 0, NUMBER_OF_CONTROLS, "VCOAmpli" },
+    { "GainCtrl",    offsetof(synth_parm_noise,control_control_gain),  4, 2, 0, NUMBER_OF_CONTROLS, "VCOGain" },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 

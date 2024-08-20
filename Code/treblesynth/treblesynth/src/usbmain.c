@@ -36,21 +36,26 @@
 #include "main.h"
 #include "synth.h"
 
-//------------- prototypes -------------//
+const uint8_t control_change_values_list[NUMBER_OF_CC_CONTROLS] = 
+{
+    1,   2,   4,   7,   10,  11,  12,  13,  16,  17,
+    18,  19,  64,  65,  66,  67,  68,  69,  70,  71, 
+    72,  73,  74,  75,  76,  77,  78,  79,  80,  81, 
+    82,  83,  84,  91,  92,  93,  94,  95,  33,  39 };
+
+uint8_t control_change_values[NUMBER_OF_CC_CONTROLS];
+
 void cdc_task(void);
 
-/*------------- MAIN -------------*/
 int usb_init(void)
 {
-  // init device stack on configured roothub port
+  memset((void *)control_change_values,'\000',sizeof(control_change_values));
   tud_init(BOARD_TUD_RHPORT);
-
   return 0;
 }
 
 static uint usb_did_write = 0;
 static uint32_t usb_write_last_flush = 0;
-
 
 void usb_write_char(uint8_t ch)
 {
@@ -148,6 +153,16 @@ bool midi_perform_event(const uint8_t cmdbuf[], int num)
                         {   
                             synth_panic();
                             ex = true;
+                            break;
+                        }
+                        for (int i=0;i<NUMBER_OF_CC_CONTROLS ;i++)
+                        {
+                            if (control_change_values_list[i] == cmdbuf[1])
+                            {
+                                control_change_values[i] = cmdbuf[2];
+                                set_control_changes_midi(i, cmdbuf[2]);
+                                break;
+                            }
                         }
                         break;
             case 0xE0:  {

@@ -134,8 +134,8 @@ const dsp_parm_configuration_entry dsp_parm_configuration_entry_sin_synth[] =
     { "Freq3",        offsetof(dsp_parm_sine_synth,frequency[2]),     4, 4, 100, 4000, NULL },
     { "Amplitude3",   offsetof(dsp_parm_sine_synth,amplitude[2]),     4, 3, 0,   255, NULL },
     { "Mixval",       offsetof(dsp_parm_sine_synth,mixval),           4, 4, 0,   255, NULL },
-    { "FreqCtrl",     offsetof(dsp_parm_sine_synth,control_number1),  4, 2, 0, POTENTIOMETER_MAX, "SinFreq" },
-    { "AmpCtrl",      offsetof(dsp_parm_sine_synth,control_number2),  4, 2, 0, POTENTIOMETER_MAX, "SinAmpl" },
+    { "FreqCtrl",     offsetof(dsp_parm_sine_synth,control_number1),  4, 2, 0, NUMBER_OF_CONTROLS, "SinFreq" },
+    { "AmpCtrl",      offsetof(dsp_parm_sine_synth,control_number2),  4, 2, 0, NUMBER_OF_CONTROLS, "SinAmpl" },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
 
@@ -173,7 +173,7 @@ const dsp_parm_configuration_entry dsp_parm_configuration_entry_noisegate[] =
 {
     { "Threshold",       offsetof(dsp_parm_noisegate,threshold),           4, 5, 1, ADC_PREC_VALUE/2, NULL},
     { "Response",        offsetof(dsp_parm_noisegate,response),            4, 1, 1, 3, NULL },
-    { "ThresholdCtrl",   offsetof(dsp_parm_noisegate,control_number1),     4, 2, 0, POTENTIOMETER_MAX, "NoiseThr" },
+    { "ThresholdCtrl",   offsetof(dsp_parm_noisegate,control_number1),     4, 2, 0, NUMBER_OF_CONTROLS, "NoiseThr" },
     { "SourceUnit", offsetof(dsp_parm_noisegate,source_unit),     4, 2, 1, MAX_DSP_UNITS, NULL },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
@@ -206,8 +206,8 @@ const dsp_parm_configuration_entry dsp_parm_configuration_entry_delay[] =
 {
     { "Samples",    offsetof(dsp_parm_delay,delay_samples),   4, 5, 1, SAMPLE_CIRC_BUF_SIZE, NULL },
     { "EchoRed",    offsetof(dsp_parm_delay,echo_reduction),  4, 3, 0, 255, NULL },
-    { "SampCtrl",   offsetof(dsp_parm_delay,control_number1), 4, 2, 0, POTENTIOMETER_MAX, "DlySamp" },
-    { "EchoCtrl",   offsetof(dsp_parm_delay,control_number2), 4, 2, 0, POTENTIOMETER_MAX, "DlyEcho" },
+    { "SampCtrl",   offsetof(dsp_parm_delay,control_number1), 4, 2, 0, NUMBER_OF_CONTROLS, "DlySamp" },
+    { "EchoCtrl",   offsetof(dsp_parm_delay,control_number2), 4, 2, 0, NUMBER_OF_CONTROLS, "DlyEcho" },
     { "SourceUnit", offsetof(dsp_parm_delay,source_unit),     4, 2, 1, MAX_DSP_UNITS, NULL },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
@@ -338,7 +338,7 @@ const dsp_parm_configuration_entry dsp_parm_configuration_entry_bandpass[] =
 {
     { "Frequency",   offsetof(dsp_parm_bandpass,frequency),       2, 4, 100, 4000, NULL },
     { "Q",           offsetof(dsp_parm_bandpass,Q),               2, 3, 50, 999, NULL },
-    { "FreqCntrl",   offsetof(dsp_parm_bandpass,control_number1), 4, 2, 0, POTENTIOMETER_MAX, "BPFreq" },
+    { "FreqCntrl",   offsetof(dsp_parm_bandpass,control_number1), 4, 2, 0, NUMBER_OF_CONTROLS, "BPFreq" },
     { "SourceUnit",  offsetof(dsp_parm_bandpass,source_unit),     4, 2, 1, MAX_DSP_UNITS, NULL },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
@@ -385,7 +385,7 @@ const dsp_parm_configuration_entry dsp_parm_configuration_entry_lowpass[] =
 {
     { "Frequency",   offsetof(dsp_parm_lowpass,frequency),       2, 4, 100, 4000, NULL },
     { "Q",           offsetof(dsp_parm_lowpass,Q),               2, 3, 50, 999, NULL },
-    { "FreqCntrl",   offsetof(dsp_parm_lowpass,control_number1), 4, 2, 0, POTENTIOMETER_MAX, "LPFreq" },
+    { "FreqCntrl",   offsetof(dsp_parm_lowpass,control_number1), 4, 2, 0, NUMBER_OF_CONTROLS, "LPFreq" },
     { "SourceUnit",  offsetof(dsp_parm_lowpass,source_unit),     4, 2, 1, MAX_DSP_UNITS, NULL },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
@@ -432,7 +432,7 @@ const dsp_parm_configuration_entry dsp_parm_configuration_entry_highpass[] =
 {
     { "Frequency",   offsetof(dsp_parm_highpass,frequency),       2, 4, 100, 4000, NULL },
     { "Q",           offsetof(dsp_parm_highpass,Q),               2, 3, 50, 999, NULL },
-    { "FreqCntrl",   offsetof(dsp_parm_highpass,control_number1), 4, 2, 0, POTENTIOMETER_MAX, "HPFreq" },
+    { "FreqCntrl",   offsetof(dsp_parm_highpass,control_number1), 4, 2, 0, NUMBER_OF_CONTROLS, "HPFreq" },
     { "SourceUnit",  offsetof(dsp_parm_highpass,source_unit),     4, 2, 1, MAX_DSP_UNITS, NULL },
     { NULL, 0, 4, 0, 0,   1, NULL   }
 };
@@ -475,7 +475,7 @@ const dsp_parm_configuration_entry dsp_parm_configuration_entry_allpass[] =
 {
     { "Frequency",   offsetof(dsp_parm_allpass,frequency),       2, 4, 100, 4000, NULL },
     { "Q",           offsetof(dsp_parm_allpass,Q),               2, 3, 50, 999, NULL },
-    { "FreqCntrl",   offsetof(dsp_parm_allpass,control_number1), 4, 2, 0, POTENTIOMETER_MAX, "APFreq" },
+    { "FreqCntrl",   offsetof(dsp_parm_allpass,control_number1), 4, 2, 0, NUMBER_OF_CONTROLS, "APFreq" },
     { "SourceUnit",  offsetof(dsp_parm_allpass,source_unit),     4, 2, 1, MAX_DSP_UNITS, NULL },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
@@ -514,8 +514,8 @@ const dsp_parm_configuration_entry dsp_parm_configuration_entry_tremolo[] =
 {
     { "Frequency",    offsetof(dsp_parm_tremolo,frequency),       4, 2, 1, 32, NULL },
     { "Modulation",   offsetof(dsp_parm_tremolo,modulation),      4, 3, 0, 255, NULL },
-    { "FreqCntrl",    offsetof(dsp_parm_tremolo,control_number1), 4, 2, 0, POTENTIOMETER_MAX, "TremFreq" },
-    { "ModCntrl",     offsetof(dsp_parm_tremolo,control_number2), 4, 2, 0, POTENTIOMETER_MAX, "TremMod" },
+    { "FreqCntrl",    offsetof(dsp_parm_tremolo,control_number1), 4, 2, 0, NUMBER_OF_CONTROLS, "TremFreq" },
+    { "ModCntrl",     offsetof(dsp_parm_tremolo,control_number2), 4, 2, 0, NUMBER_OF_CONTROLS, "TremMod" },
     { "SourceUnit",   offsetof(dsp_parm_tremolo,source_unit),     4, 2, 1, MAX_DSP_UNITS, NULL },
     { NULL, 0, 4, 0, 0,   1, NULL }
 };
@@ -559,8 +559,8 @@ const dsp_parm_configuration_entry dsp_parm_configuration_entry_vibrato[] =
     { "Frequency",    offsetof(dsp_parm_vibrato,frequency),       4, 2, 1, 32, NULL },
     { "Modulation",   offsetof(dsp_parm_vibrato,modulation),      4, 3, 0, 255, NULL },
     { "Samples",      offsetof(dsp_parm_vibrato,delay_samples),   4, 5, 1, SAMPLE_CIRC_BUF_SIZE, NULL },
-    { "FreqCntrl",    offsetof(dsp_parm_vibrato,control_number1), 4, 2, 0, POTENTIOMETER_MAX, "VibFreq" },
-    { "ModCntrl",     offsetof(dsp_parm_vibrato,control_number2), 4, 2, 0, POTENTIOMETER_MAX, "VibMod" },
+    { "FreqCntrl",    offsetof(dsp_parm_vibrato,control_number1), 4, 2, 0, NUMBER_OF_CONTROLS, "VibFreq" },
+    { "ModCntrl",     offsetof(dsp_parm_vibrato,control_number2), 4, 2, 0, NUMBER_OF_CONTROLS, "VibMod" },
     { "SourceUnit",   offsetof(dsp_parm_vibrato,source_unit),     4, 2, 1, MAX_DSP_UNITS, NULL },
     { NULL, 0, 4, 0, 0,   1, NULL   }
 };
@@ -616,7 +616,7 @@ const dsp_parm_configuration_entry dsp_parm_configuration_entry_wah[] =
     { "Freq1",        offsetof(dsp_parm_wah,freq1),           2, 4, 100, 4000, NULL },
     { "Freq2",        offsetof(dsp_parm_wah,freq2),           2, 4, 100, 4000, NULL },
     { "Q",            offsetof(dsp_parm_wah,Q),               2, 3, 50, 999, NULL },
-    { "FreqCntrl",    offsetof(dsp_parm_wah,control_number1), 4, 2, 0, POTENTIOMETER_MAX, "WahFreQ" },
+    { "FreqCntrl",    offsetof(dsp_parm_wah,control_number1), 4, 2, 0, NUMBER_OF_CONTROLS, "WahFreQ" },
     { "Reverse",      offsetof(dsp_parm_wah,reverse),         4, 1, 0, 1, NULL },
     { "SourceUnit",   offsetof(dsp_parm_wah,source_unit),     4, 2, 1, MAX_DSP_UNITS, NULL },
     { NULL, 0, 4, 0, 0,   1., NULL    }
@@ -684,7 +684,7 @@ const dsp_parm_configuration_entry dsp_parm_configuration_entry_autowah[] =
     { "Freq2",        offsetof(dsp_parm_autowah,freq2),            2, 4, 100, 4000, NULL },
     { "Q",            offsetof(dsp_parm_autowah,Q),                2, 3, 50,  999, NULL },
     { "Speed",        offsetof(dsp_parm_autowah,frequency),        4, 4, 1, 4095, NULL },
-    { "SpeedCntrl",   offsetof(dsp_parm_autowah,control_number1),  4, 2, 0, POTENTIOMETER_MAX, "AWahFreq" },
+    { "SpeedCntrl",   offsetof(dsp_parm_autowah,control_number1),  4, 2, 0, NUMBER_OF_CONTROLS, "AWahFreq" },
     { "SourceUnit",   offsetof(dsp_parm_autowah,source_unit),      4, 2, 1, MAX_DSP_UNITS, NULL },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
@@ -811,7 +811,7 @@ const dsp_parm_configuration_entry dsp_parm_configuration_entry_distortion[] =
     { "Gain",         offsetof(dsp_parm_distortion,gain),                    4, 3, 1, 255, NULL },
     { "NoiseGate",    offsetof(dsp_parm_distortion,noise_gate),              4, 3, 0, 255, NULL },
     { "Offset",       offsetof(dsp_parm_distortion,sample_offset),           4, 3, 0, 255, NULL },
-    { "GainCntrl",    offsetof(dsp_parm_distortion,control_number1),         4, 2, 0, POTENTIOMETER_MAX, "DistGain" },
+    { "GainCntrl",    offsetof(dsp_parm_distortion,control_number1),         4, 2, 0, NUMBER_OF_CONTROLS, "DistGain" },
     { "SourceUnit",   offsetof(dsp_parm_distortion,source_unit),             4, 2, 1, MAX_DSP_UNITS, NULL },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
@@ -859,8 +859,8 @@ const dsp_parm_configuration_entry dsp_parm_configuration_entry_overdrive[] =
 {
     { "Threshold",    offsetof(dsp_parm_overdrive,threshold),               4, 3, 1, 255, NULL },
     { "Amplitude",    offsetof(dsp_parm_overdrive,amplitude),               4, 3, 1, 255, NULL },
-    { "ThrshCntrl",   offsetof(dsp_parm_overdrive,control_number1),         4, 2, 0, POTENTIOMETER_MAX, "OverThrsh" },
-    { "AmplCntrl",    offsetof(dsp_parm_overdrive,control_number2),         4, 2, 0, POTENTIOMETER_MAX, "OverAmpl" },
+    { "ThrshCntrl",   offsetof(dsp_parm_overdrive,control_number1),         4, 2, 0, NUMBER_OF_CONTROLS, "OverThrsh" },
+    { "AmplCntrl",    offsetof(dsp_parm_overdrive,control_number2),         4, 2, 0, NUMBER_OF_CONTROLS, "OverAmpl" },
     { "SourceUnit",   offsetof(dsp_parm_overdrive,source_unit),             4, 2, 1, MAX_DSP_UNITS, NULL },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
@@ -918,8 +918,8 @@ const dsp_parm_configuration_entry dsp_parm_configuration_entry_compressor[] =
     { "Release",      offsetof(dsp_parm_compressor,release),                 4, 3, 1, 511, NULL },
     { "AtkThresh",    offsetof(dsp_parm_compressor,attack_threshold),        4, 5, 0, ADC_PREC_VALUE, NULL },
     { "RlsThresh",    offsetof(dsp_parm_compressor,release_threshold),       4, 5, 0, ADC_PREC_VALUE, NULL },
-    { "AtkCtrl",      offsetof(dsp_parm_compressor,control_number1),         4, 2, 0, POTENTIOMETER_MAX, "CompAttk" },
-    { "RlsCtrl",      offsetof(dsp_parm_compressor,control_number2),         4, 2, 0, POTENTIOMETER_MAX, "CompRls" },
+    { "AtkCtrl",      offsetof(dsp_parm_compressor,control_number1),         4, 2, 0, NUMBER_OF_CONTROLS, "CompAttk" },
+    { "RlsCtrl",      offsetof(dsp_parm_compressor,control_number2),         4, 2, 0, NUMBER_OF_CONTROLS, "CompRls" },
     { "SourceUnit",   offsetof(dsp_parm_compressor,source_unit),             4, 2, 1, MAX_DSP_UNITS, NULL },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
@@ -958,7 +958,7 @@ const dsp_parm_configuration_entry dsp_parm_configuration_entry_ring[] =
 {
     { "Speed",        offsetof(dsp_parm_ring,frequency),       4, 3, 1, 4095, NULL },
     { "SineMix",      offsetof(dsp_parm_ring,sine_mix),        4, 1, 0, 1, NULL },
-    { "SpeedCntrl",   offsetof(dsp_parm_ring,control_number1), 4, 2, 0, POTENTIOMETER_MAX, "RingFreq" },
+    { "SpeedCntrl",   offsetof(dsp_parm_ring,control_number1), 4, 2, 0, NUMBER_OF_CONTROLS, "RingFreq" },
     { "SourceUnit",   offsetof(dsp_parm_ring,source_unit),     4, 2, 1, MAX_DSP_UNITS, NULL },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
@@ -1002,8 +1002,8 @@ const dsp_parm_configuration_entry dsp_parm_configuration_entry_flange[] =
     { "Modulation",   offsetof(dsp_parm_flange,modulation),      4, 3, 0, 255, NULL },
     { "Samples",      offsetof(dsp_parm_flange,delay_samples),   4, 5, 1, SAMPLE_CIRC_BUF_SIZE, NULL },
     { "Feedback",     offsetof(dsp_parm_flange,feedback),        4, 3, 0, 255, NULL },
-    { "SpeedCntrl",   offsetof(dsp_parm_flange,control_number1), 4, 2, 0, POTENTIOMETER_MAX, "FlngFreq" },
-    { "ModCntrl",     offsetof(dsp_parm_flange,control_number2), 4, 2, 0, POTENTIOMETER_MAX, "FlngMod" },
+    { "SpeedCntrl",   offsetof(dsp_parm_flange,control_number1), 4, 2, 0, NUMBER_OF_CONTROLS, "FlngFreq" },
+    { "ModCntrl",     offsetof(dsp_parm_flange,control_number2), 4, 2, 0, NUMBER_OF_CONTROLS, "FlngMod" },
     { "SourceUnit",   offsetof(dsp_parm_flange,source_unit),     4, 2, 1, MAX_DSP_UNITS, NULL },
     { NULL, 0, 4, 0, 0,   1, NULL  }
 };
@@ -1050,8 +1050,8 @@ const dsp_parm_configuration_entry dsp_parm_configuration_entry_chorus[] =
     { "Modulation",   offsetof(dsp_parm_chorus,modulation),      4, 3, 0, 255, NULL },
     { "Samples",      offsetof(dsp_parm_chorus,delay_samples),   4, 5, 1, SAMPLE_CIRC_BUF_SIZE, NULL },
     { "Mixval",       offsetof(dsp_parm_chorus,mixval),          4, 3, 0, 255, NULL },
-    { "SpeedCntrl",   offsetof(dsp_parm_chorus,control_number1), 4, 2, 0, POTENTIOMETER_MAX, "ChorusFreq" },
-    { "ModCntrl",     offsetof(dsp_parm_chorus,control_number2), 4, 2, 0, POTENTIOMETER_MAX, "ChorusMod" },
+    { "SpeedCntrl",   offsetof(dsp_parm_chorus,control_number1), 4, 2, 0, NUMBER_OF_CONTROLS, "ChorusFreq" },
+    { "ModCntrl",     offsetof(dsp_parm_chorus,control_number2), 4, 2, 0, NUMBER_OF_CONTROLS, "ChorusMod" },
     { "SourceUnit",   offsetof(dsp_parm_chorus,source_unit),     4, 2, 1, MAX_DSP_UNITS, NULL },
     { NULL, 0, 4, 0, 0,   1 , NULL   }
 };
@@ -1125,7 +1125,7 @@ const dsp_parm_configuration_entry dsp_parm_configuration_entry_phaser[] =
     { "Speed",        offsetof(dsp_parm_phaser,frequency),       4, 4, 1, 4095, NULL },
     { "Stages",       offsetof(dsp_parm_phaser,stages),          4, 1, 2, PHASER_STAGES, NULL },
     { "Mixval",       offsetof(dsp_parm_phaser,mixval),          4, 3, 0, 255, NULL },
-    { "SpeedCntrl",   offsetof(dsp_parm_phaser,control_number1), 4, 2, 0, POTENTIOMETER_MAX, "PhaserFreq" },
+    { "SpeedCntrl",   offsetof(dsp_parm_phaser,control_number1), 4, 2, 0, NUMBER_OF_CONTROLS, "PhaserFreq" },
     { "SourceUnit",   offsetof(dsp_parm_phaser,source_unit),     4, 2, 1, MAX_DSP_UNITS, NULL},
     { NULL, 0, 4, 0, 0,   1, NULL  }
 };
@@ -1160,8 +1160,8 @@ const dsp_parm_configuration_entry dsp_parm_configuration_entry_backwards[] =
 {
     { "Samples",    offsetof(dsp_parm_backwards,backwards_samples),   4, 5, 1, SAMPLE_CIRC_BUF_CLEAN_SIZE, NULL },
     { "Balance",     offsetof(dsp_parm_backwards,balance),             4, 3, 0, 255, NULL },
-    { "SampCtrl",   offsetof(dsp_parm_backwards,control_number1), 4, 2, 0, POTENTIOMETER_MAX, "BackSampls" },
-    { "BalCtrl",   offsetof(dsp_parm_backwards,control_number2), 4, 2, 0, POTENTIOMETER_MAX, "BackBal" },
+    { "SampCtrl",   offsetof(dsp_parm_backwards,control_number1), 4, 2, 0, NUMBER_OF_CONTROLS, "BackSampls" },
+    { "BalCtrl",   offsetof(dsp_parm_backwards,control_number2), 4, 2, 0, NUMBER_OF_CONTROLS, "BackBal" },
     { "SourceUnit", offsetof(dsp_parm_backwards,source_unit),     4, 2, 1, MAX_DSP_UNITS, NULL },
     { NULL, 0, 4, 0, 0,   1, NULL    }
 };
@@ -1256,8 +1256,8 @@ const dsp_parm_configuration_entry dsp_parm_configuration_entry_pitchshift[] =
     { "Balance",    offsetof(dsp_parm_pitchshift,balance),             4, 3, 0, 255, NULL },
     { "Frequency",   offsetof(dsp_parm_pitchshift,frequency),       2, 4, 100, 4000, NULL },
     { "Q",           offsetof(dsp_parm_pitchshift,Q),               2, 3, 50, 999, NULL },
-    { "RateCtrl",   offsetof(dsp_parm_pitchshift,control_number3),  4, 2, 0, POTENTIOMETER_MAX, "PitchRate" },
-    { "BalCtrl",   offsetof(dsp_parm_pitchshift,control_number2),  4, 2, 0, POTENTIOMETER_MAX, "PitchBal" },
+    { "RateCtrl",   offsetof(dsp_parm_pitchshift,control_number3),  4, 2, 0, NUMBER_OF_CONTROLS, "PitchRate" },
+    { "BalCtrl",   offsetof(dsp_parm_pitchshift,control_number2),  4, 2, 0, NUMBER_OF_CONTROLS, "PitchBal" },
     { "SourceUnit", offsetof(dsp_parm_pitchshift,source_unit),     4, 2, 1, MAX_DSP_UNITS, NULL },
     { NULL, 0, 4, 0, 0,   1, NULL  }
 };
@@ -1324,7 +1324,7 @@ const dsp_parm_configuration_entry dsp_parm_configuration_entry_whammy[] =
     { "Samples",    offsetof(dsp_parm_whammy,whammy_samples),   4, 5, 1, 2048, NULL },
     { "Adjust",     offsetof(dsp_parm_whammy,whammy_adj),       4, 5, 1, 4000, NULL },
     { "UpOrDown",   offsetof(dsp_parm_whammy,whammy_sign),      4, 1, 0, 1, NULL },
-    { "AdjCtrl",    offsetof(dsp_parm_whammy,control_number3),  4, 2, 0, POTENTIOMETER_MAX, "WhammyAdj" },
+    { "AdjCtrl",    offsetof(dsp_parm_whammy,control_number3),  4, 2, 0, NUMBER_OF_CONTROLS, "WhammyAdj" },
     { "SourceUnit", offsetof(dsp_parm_whammy,source_unit),     4, 2, 1, MAX_DSP_UNITS, NULL },
     { NULL, 0, 4, 0, 0,   1, NULL  }
 };

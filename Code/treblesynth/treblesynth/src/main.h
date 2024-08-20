@@ -33,6 +33,7 @@ uint8_t get_scan_button(uint8_t b);
 int uart0_input(void);
 void uart0_output(const uint8_t *data, int num);
 void idle_task(void);
+void set_control_changes_midi(int i, int val);
 
 #ifdef __cplusplus
 }

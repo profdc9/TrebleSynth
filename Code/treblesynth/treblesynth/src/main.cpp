@@ -37,9 +37,6 @@
 
 #include "usbmain.h"
 
-#define NUMBER_OF_CONTROLS 24
-#define CONTROL_VALUE_LENGTH 16
-
 volatile bool waiting_for_sample = false;
 volatile uint16_t next_sample = 0;
 
@@ -51,7 +48,7 @@ bool sample_changed[NUMBER_OF_CONTROLS];
 bool control_direction[NUMBER_OF_CONTROLS];
 bool control_enabled[NUMBER_OF_CONTROLS];
 
-char control_value[NUMBER_OF_CONTROLS][CONTROL_VALUE_LENGTH];
+char control_value[NUMBER_OF_CONTROLS+1][CONTROL_VALUE_LENGTH];
 
 uint current_input = 0;
 uint control_sample_no = 0;
@@ -92,10 +89,18 @@ void initialize_project_configuration(void)
         memcpy((void *)&pc, (void *)&pc_default, sizeof(pc));
 }
 
+static inline int potentiometer_index_value(uint c)
+{
+    if ((c > ((sizeof(potentiometer_mapping)/sizeof(potentiometer_mapping[0])))) && (c <= NUMBER_OF_CONTROLS))
+        return c-1;
+    if (c >= 1) return potentiometer_mapping[c-1];
+    return 0;
+}
+
 void potentiometer_set_state(uint c, bool state)
 {
-    if ((c>=1) && (c<=((sizeof(potentiometer_mapping)/sizeof(potentiometer_mapping[0])))))
-        control_enabled[potentiometer_mapping[c-1]] = state;
+    int ind = potentiometer_index_value(c);
+    if (ind != 0) control_enabled[ind] = state;
 }
 
 void keyboard_poll(void)
@@ -116,9 +121,9 @@ void controls_poll(void)
 {
     int val, pos;
     if (pause_poll_controls) return;
-    for (uint c=1;c<((sizeof(potentiometer_mapping)/sizeof(potentiometer_mapping[0])));c++)
+    for (uint c=1;c<=NUMBER_OF_CONTROLS;c++)
     {
-        int m = potentiometer_mapping[c-1];
+        int m = potentiometer_index_value(c);
         if ((control_value[c][0] != '\000') && (control_value[c][0] != ' ') && (sample_changed[m]))
         {
             write_str_with_spaces(0,7,control_enabled[m] ? "\015" : (control_direction[m] ? "\014" : "\013"),1);
@@ -238,20 +243,8 @@ void initialize_uart(void)
     irq_set_enabled(UART0_IRQ, true);
 }
 
-inline void poll_potentiometers_and_buttons(void)
+static inline void set_sample(uint16_t sample, uint current_sample_no)
 {
-   static uint32_t last_us;
-   uint32_t current_us;
-   uint current_sample_no;
-   uint16_t sample;  
-  
-   current_us = time_us_32();
-   if ((current_us - last_us) < 5000) return;
-   last_us = current_us;
-
-   current_sample_no = current_input+control_sample_no*8;
-   sample = adc_hw->result;
-
    if ( (sample > (current_samples[current_sample_no] + POTENTIOMETER_VALUE_SENSITIVITY)) || 
         (current_samples[current_sample_no] > (sample + POTENTIOMETER_VALUE_SENSITIVITY)) )
    {
@@ -269,8 +262,29 @@ inline void poll_potentiometers_and_buttons(void)
                 samples[current_sample_no] = sample;
                 control_enabled[current_sample_no] = true;
             }
-   }
-   
+   }    
+}
+
+void set_control_changes_midi(int i, int val)
+{
+    set_sample(val*(ADC_MAX_VALUE/128), i+NUMBER_OF_POT_CONTROLS);
+}
+
+static inline void poll_potentiometers_and_buttons(void)
+{
+   static uint32_t last_us;
+   uint32_t current_us;
+   uint current_sample_no;
+   uint16_t sample;  
+  
+   current_us = time_us_32();
+   if ((current_us - last_us) < 5000) return;
+   last_us = current_us;
+
+   current_sample_no = current_input+control_sample_no*8;
+   sample = adc_hw->result;
+   set_sample(sample, current_sample_no);
+
    button_state[current_input] = gpio_get(GPIO_BUTTON1);
    button_state[current_input+8] = gpio_get(GPIO_BUTTON2);
    button_state[current_input+16] = gpio_get(GPIO_BUTTON3);
@@ -383,9 +397,8 @@ void initialize_pwm(void)
 
 uint16_t read_potentiometer_value(uint v)
 {
-    if ((v == 0) || (v > (sizeof(potentiometer_mapping)/sizeof(potentiometer_mapping[0]))))
-        return 0;
-    return (uint16_t)(samples[potentiometer_mapping[v-1]]*(POT_MAX_VALUE/ADC_MAX_VALUE));
+    int ind = potentiometer_index_value(v);
+    return ((uint16_t)((ind == 0) ? 0 : (samples[ind]*(POT_MAX_VALUE/ADC_MAX_VALUE))));
 }
 
 absolute_time_t last_time;
@@ -1024,6 +1037,7 @@ int flash_load_bank(uint bankno)
         initialize_project_configuration();
         dsp_unit_reset_all();
         synth_unit_reset_all();
+        reset_load_controls();
     } else return -1;
     return 0;
 }
@@ -1083,7 +1097,6 @@ int flash_load(void)
         message_to_display("Not Loaded");
     } else
     {
-        reset_load_controls();
         message_to_display("Loaded");
     }
     return 0;
@@ -1111,8 +1124,7 @@ void flash_load_most_recent(void)
     }
     if (load_bankno < FLASH_BANKS) 
     {
-        if (!flash_load_bank(load_bankno))
-            reset_load_controls();
+        flash_load_bank(load_bankno);
     }
 }
 
@@ -1207,15 +1219,6 @@ void debugstuff(void)
 const char * const mainmenu[] = { "SynthAdj", "FiltAdjust", "Panic", "Debug", "Pedal", "Load", "Save", "Conf", NULL };
 
 menu_str mainmenu_str = { mainmenu, 0, 2, 15, 0, 0 };
-
-int test_cmd(int args, tinycl_parameter* tp, void *v)
-{
-  char s[20];
-  tinycl_put_string("TEST=");
-  sprintf(s,"%d\r\n",counter,counter);
-  tinycl_put_string(s);
-  return 1;
-}
 
 void e_type_cmd_write(uint unit_no, dsp_unit_type dut)
 {
@@ -1423,7 +1426,8 @@ void update_control_values(void)
           {
             if (synth_unit_get_value(unit_no, spce->desc, &value))
             {
-                if ((value >= 1) && (value <= ((sizeof(potentiometer_mapping)/sizeof(potentiometer_mapping[0])))))
+                int ind = potentiometer_index_value(value);
+                if (ind != 0)
                 {
                    char s[CONTROL_VALUE_LENGTH+1];
                    snprintf(s, CONTROL_VALUE_LENGTH, "%02d %s", unit_no+1, spce->controldesc);
@@ -1449,7 +1453,8 @@ void update_control_values(void)
           {
             if (dsp_unit_get_value(unit_no, dpce->desc, &value))
             {
-                if ((value >= 1) && (value <= ((sizeof(potentiometer_mapping)/sizeof(potentiometer_mapping[0])))))
+                int ind = potentiometer_index_value(value);
+                if (ind != 0)
                 {
                    char s[CONTROL_VALUE_LENGTH+1];
                    snprintf(s, CONTROL_VALUE_LENGTH, "%02d %s", unit_no+1, dpce->controldesc);
@@ -1632,7 +1637,6 @@ const tinycl_command tcmds[] =
   { "STYPE", "Get synth type", stype_cmd, TINYCL_PARM_INT, TINYCL_PARM_END },
   { "PSET",  "Potentiometer Set", pset_cmd, TINYCL_PARM_INT, TINYCL_PARM_INT, TINYCL_PARM_END },
   { "PGET",  "Potentiometer Get", pget_cmd, TINYCL_PARM_INT, TINYCL_PARM_END },
-  { "TEST", "Test", test_cmd, TINYCL_PARM_INT, TINYCL_PARM_END },
   { "HELP", "Display This Help", help_cmd, {TINYCL_PARM_END } }
 };
 
