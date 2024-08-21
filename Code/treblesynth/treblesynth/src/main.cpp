@@ -91,10 +91,8 @@ void initialize_project_configuration(void)
 
 static inline int potentiometer_index_value(uint c)
 {
-    if ((c > ((sizeof(potentiometer_mapping)/sizeof(potentiometer_mapping[0])))) && (c <= NUMBER_OF_CONTROLS))
-        return c-1;
-    if (c >= 1) return potentiometer_mapping[c-1];
-    return 0;
+    if ((c == 0) || (c > NUMBER_OF_CONTROLS)) return 0;
+    return (c > ((sizeof(potentiometer_mapping)/sizeof(potentiometer_mapping[0])))) ? c-1 : potentiometer_mapping[c-1];
 }
 
 void potentiometer_set_state(uint c, bool state)
@@ -680,7 +678,7 @@ void adjust_dsp_parms_unit(uint8_t unit_no)
                 {
                    dsp_set_value_prec((void *)(((uint8_t *)&dsp_parms[unit_no]) + d[sel-1].offset), d[sel-1].size, snd.n);
                    update_control_values();
-                   potentiometer_set_state(snd.n,true);
+                   if (d[sel-1].controldesc != NULL) potentiometer_set_state(snd.n,true);
                 }
             }
             redraw = 1;
@@ -823,7 +821,7 @@ void adjust_synth_parms_unit(uint8_t unit_no)
                 {
                    synth_set_value_prec((void *)(((uint8_t *)&synth_parms[unit_no]) + sp[sel-1].offset), sp[sel-1].size, snd.n);
                    update_control_values();
-                   potentiometer_set_state(snd.n,true);
+                   if (sp[sel-1].controldesc != NULL) potentiometer_set_state(snd.n,true);
                 }
             }
             redraw = 1;

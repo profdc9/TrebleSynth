@@ -538,6 +538,49 @@ const synth_parm_configuration_entry synth_parm_configuration_entry_vdo[] =
 
 const synth_parm_vdo synth_parm_vdo_default = { 1, 0, 0, 1, 1, 256, 4096, 128, 0, 1 };
 
+/**************************** SYNTH_TYPE_FOLD **************************************************/
+
+#ifdef PLACE_IN_RAM
+static int32_t __no_inline_not_in_flash_func(synth_type_process_fold)(synth_parm *sp, synth_unit *su)
+#else
+int32_t synth_type_process_fold(synth_parm *sp, synth_unit *su)
+#endif
+{
+    int32_t control = ((*su->stfold.control_ptr) * ((int32_t)sp->stfold.control_gain)) / 512 + 
+                      (((int32_t)sp->stfold.amplitude) * (QUANTIZATION_MAX / 512));
+    
+    int32_t sample = *su->stfold.sample_ptr;
+    int32_t val1 = su->stfold.wave[(((sample + QUANTIZATION_MAX) / (2*QUANTIZATION_MAX / WAVETABLES_LENGTH)) + sp->stfold.offset) & (WAVETABLES_LENGTH-1)];
+    sample = (sample * control) / (QUANTIZATION_MAX / 16);
+    int32_t val2 = su->stfold.wave[(((sample + QUANTIZATION_MAX) / (2*QUANTIZATION_MAX / WAVETABLES_LENGTH)) + sp->stfold.offset) & (WAVETABLES_LENGTH-1)];
+    
+    return (val2*((int32_t)sp->stfold.ampmix)+val1*((int32_t)(256-sp->stfold.ampmix)))/256;
+}
+
+void synth_note_start_fold(synth_parm *sp, synth_unit *su, synth_start_st *sst)
+{
+    if (sp->stfold.control_amplitude != 0)
+        sp->stfold.amplitude = read_potentiometer_value(sp->stfold.control_amplitude)/(POT_MAX_VALUE/256);
+    su->stfold.sample_ptr = &synth_unit_result[sst->note][sp->stfold.source_unit-1];
+    su->stfold.control_ptr = &synth_unit_result[sst->note][sp->stfold.control_unit-1];
+    su->stfold.wave = wavetables[sp->stfold.osc_type-1];
+}
+
+const synth_parm_configuration_entry synth_parm_configuration_entry_fold[] = 
+{
+    { "SourceUnit",  offsetof(synth_parm_fold,source_unit),        4, 2, 1, MAX_SYNTH_UNITS, NULL },
+    { "ControlUnit", offsetof(synth_parm_fold,control_unit),       4, 2, 1, MAX_SYNTH_UNITS, NULL },
+    { "ControlGain", offsetof(synth_parm_fold,control_gain),       4, 3, 0, 256, NULL },
+    { "OscType",     offsetof(synth_parm_fold,osc_type),           4, 2, 1, WAVETABLES_NUMBER, NULL },
+    { "Amplitude",   offsetof(synth_parm_fold,amplitude),          4, 3, 0, 255, NULL },
+    { "Offset",      offsetof(synth_parm_fold,offset),             4, 4, 0, WAVETABLES_LENGTH-1, NULL },
+    { "AmpMix",      offsetof(synth_parm_fold,ampmix),             4, 3, 0, 256, NULL },
+    { "AmplCtrl",    offsetof(synth_parm_fold,control_amplitude),  4, 2, 0, NUMBER_OF_CONTROLS, "FOLDAmpli" },
+    { NULL, 0, 4, 0, 0,   1, NULL    }
+};
+
+const synth_parm_fold synth_parm_fold_default = { 0, 0, 0, 0, 5, 255, 0, 128, 0 };
+
 /**************************** SYNTH_TYPE_NOISE **************************************************/
 
 #ifdef PLACE_IN_RAM
@@ -603,10 +646,11 @@ const char * const stnames[] =
     "VCF",
     "LFO",
     "VCA",
-    "Mixer",
-    "Ring",
+    "MIXER",
+    "RING",
     "VDO",
-    "Noise",
+    "FOLD",
+    "NOISE",
     NULL
 };
 
@@ -621,6 +665,7 @@ const synth_parm_configuration_entry * const spce[] =
     synth_parm_configuration_entry_mixer,
     synth_parm_configuration_entry_ring,
     synth_parm_configuration_entry_vdo,
+    synth_parm_configuration_entry_fold,
     synth_parm_configuration_entry_noise,
     NULL
 };
@@ -635,6 +680,7 @@ synth_type_process * const stp[] = {
     synth_type_process_mixer,
     synth_type_process_ring,
     synth_type_process_vdo,
+    synth_type_process_fold,
     synth_type_process_noise,
 };
 
@@ -649,6 +695,7 @@ synth_note_start * const sns[] =
     synth_note_start_mixer,
     synth_note_start_ring,
     synth_note_start_vdo,
+    synth_note_start_fold,
     synth_note_start_noise,
 };
 
@@ -663,6 +710,7 @@ const void * const synth_parm_struct_defaults[] =
     (void *) &synth_parm_mixer_default,
     (void *) &synth_parm_ring_default,
     (void *) &synth_parm_vdo_default,
+    (void *) &synth_parm_fold_default,
     (void *) &synth_parm_noise_default,
 };
 

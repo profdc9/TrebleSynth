@@ -54,6 +54,7 @@ typedef enum
     SYNTH_TYPE_MIXER,
     SYNTH_TYPE_RING,
     SYNTH_TYPE_VDO,
+    SYNTH_TYPE_FOLD,
     SYNTH_TYPE_NOISE,
     SYNTH_TYPE_MAX_ENTRY
 } synth_unit_type;
@@ -255,6 +256,26 @@ typedef struct
     uint32_t source_unit;
     uint32_t control_unit;
     int32_t  control_gain;
+    uint32_t osc_type;
+    uint32_t amplitude;
+    uint32_t control_amplitude;
+    uint32_t ampmix;
+    uint32_t offset;
+} synth_parm_fold;
+
+typedef struct
+{
+    int32_t  *sample_ptr;
+    int32_t  *control_ptr;
+    const int16_t  *wave;
+} synth_type_fold;    
+
+typedef struct
+{
+    synth_unit_type sut;
+    uint32_t source_unit;
+    uint32_t control_unit;
+    int32_t  control_gain;
     int32_t  amplitude;
     int32_t  shiftup;
     uint32_t control_amplitude;
@@ -285,6 +306,7 @@ typedef union
     synth_type_mixer        stmixer;
     synth_type_ring         string;
     synth_type_vdo          stvdo;
+    synth_type_fold         stfold;
     synth_type_noise        stnoise;
 } synth_unit;
 
@@ -299,6 +321,7 @@ typedef union
     synth_parm_mixer        stmixer;
     synth_parm_ring         string;
     synth_parm_vdo          stvdo;
+    synth_parm_fold         stfold;
     synth_parm_noise        stnoise;
 } synth_parm;
 

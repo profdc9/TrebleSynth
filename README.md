@@ -24,7 +24,8 @@ The type of modules that one can create are:
 6. Mixer.  Can be used to combine the output signals of two modules.  For example, two separate VCO FM synthesis chains can be combined together.  The mixing fraction can be modulated (for example by LFO or ADSR).
 7. Ring.  A ring modulator where the signal from one module four-quadrant multiplies another module.
 8. VDO (Variable Duty-Cycle Oscillator)  A square or sawtooth wave oscillator with a duty cycle that can be modulated (for example by an ADSR or LFO) to change the timbre.  The pitch can be modulated as well (for vibrato or chirp effects).
-9. Noise.  A noise source that can be used to create percussive effects.
+9. FOLD (Waveform Folding)  Folds a waveform by applying another periodic waveform to the amplitude of the wave.
+10. Noise.  A noise source that can be used to create percussive effects.
 
 Up to 10 modules can be used at a time.  Subtractive and FM synthesis is possible with various configurations of the modules. It also includes these effect taken from the GuitarPico ( https://www.github.com/profdc9/GuitarPico ) project:
 
