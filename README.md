@@ -18,7 +18,7 @@ The type of modules that one can create are:
 
 1. VCO (Voltage Controlled Oscillator).  Eight waveforms are included: sine, half-sine, triangle, sawtooth, 1/2 duty cycle square wave, 1/4 duty cycle square wave, 1/8 duty cycle square wave.  The pitch can be modulated by other modules so that FM synthesis can be performed, or vibrato effects can be created.
 2. ADSR (Attack Decay Sustain Release).  A envelope module that can be used to modulate the amplitude of a signal, or output the envelope directly so that, for example, an envelope may be used to modulate the pitch of the signal.
-3. VCF (Voltage Controlled Filter).  This is a up to four-pole lowpass filter modeled loosely on the 24 dB/octave Moog ladder filter.  It has an adjustable fixed frequency cutoff, or the frequency cutoff is determined by the note being played (frequency=0).
+3. VCF (Voltage Controlled Filter).  This is a up to four-pole lowpass filter modeled loosely on the 24 dB/octave Moog ladder filter.  It has an adjustable fixed frequency cutoff, or the frequency cutoff is determined by the note being played (frequency=0).  It also has a resonance adjustment.
 4. LFO (Low Frequency Oscillator).  An oscillator with a frequency that does not depend on the note frequency.  This can be used, for example, to implement vibrato and tremolo effects when used to modulate other units.
 5. VCA (Voltage Controlled Amplifier).  A voltage controlled amplifier that uses the output of another module to modulate the gain.  Additional gain may be applied with a VCA as well.
 6. Mixer.  Can be used to combine the output signals of two modules.  For example, two separate VCO FM synthesis chains can be combined together.  The mixing fraction can be modulated (for example by LFO or ADSR).

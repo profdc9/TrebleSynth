@@ -42,6 +42,7 @@ extern "C"
 #define SYNTH_OSCILLATOR_PRECISION 256
 #define SYNTH_STOPPING_COUNTER 256
 #define SYNTH_PERIOD_PRECISION 256
+#define SYNTH_PARM_PAD_LENGTH 128
 
 typedef enum 
 {
@@ -323,6 +324,7 @@ typedef union
     synth_parm_vdo          stvdo;
     synth_parm_fold         stfold;
     synth_parm_noise        stnoise;
+    uint8_t pad[SYNTH_PARM_PAD_LENGTH];
 } synth_parm;
 
 typedef struct

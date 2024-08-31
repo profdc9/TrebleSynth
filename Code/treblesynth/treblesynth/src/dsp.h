@@ -30,6 +30,8 @@ extern "C"
 {
 #endif
 
+#define DSP_PARM_PAD_LENGTH 128
+
 #define DSP_SAMPLERATE 25000u
 
 #define QUANTIZATION_BITS 15
@@ -698,6 +700,7 @@ typedef union
     dsp_parm_pitchshift   dtpitch;
     dsp_parm_whammy       dtwhammy;
     dsp_parm_octave       dtoct;
+    uint8_t pad[DSP_PARM_PAD_LENGTH];
 } dsp_parm;
 
 typedef bool    (dsp_type_initialize)(void *initialization_data, dsp_unit *du);

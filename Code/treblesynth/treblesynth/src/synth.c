@@ -714,6 +714,21 @@ const void * const synth_parm_struct_defaults[] =
     (void *) &synth_parm_noise_default,
 };
 
+const uint32_t synth_parm_struct_defaults_len[] =
+{
+    sizeof(synth_parm_none_default),
+    sizeof(synth_parm_vco_default),
+    sizeof(synth_parm_adsr_default),
+    sizeof(synth_parm_lowpass_default),
+    sizeof(synth_parm_osc_default),
+    sizeof(synth_parm_vca_default),
+    sizeof(synth_parm_mixer_default),
+    sizeof(synth_parm_ring_default),
+    sizeof(synth_parm_vdo_default),
+    sizeof(synth_parm_fold_default),
+    sizeof(synth_parm_noise_default),
+};
+
 /********************* SYNTH PROCESS STRUCTURE *******************************************/
 
 uint32_t synth_read_value_prec(void *v, int prec)
@@ -791,7 +806,8 @@ void synth_unit_initialize(int synth_unit_number, synth_unit_type sut)
     sp = synth_parm_entry(synth_unit_number);
     
     synth_unit_reset_unitno(synth_unit_number);
-    memcpy((void *)sp, synth_parm_struct_defaults[sut], sizeof(synth_parm));
+    memset((void *)sp, '\000', sizeof(synth_parm));
+    memcpy((void *)sp, synth_parm_struct_defaults[sut], synth_parm_struct_defaults_len[sut]);
     if (sp->stn.source_unit == 0)
         sp->stn.source_unit = synth_unit_number + 1;
     if (sp->stn.control_unit == 0)

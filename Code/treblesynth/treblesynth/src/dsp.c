@@ -1500,6 +1500,36 @@ const void * const dsp_parm_struct_defaults[] =
     (void *) &dsp_parm_sine_synth_default
 };
 
+const uint32_t dsp_parm_struct_defaults_len[] =
+{
+    sizeof(dsp_parm_none_default),
+    sizeof(dsp_parm_noisegate_default),
+    sizeof(dsp_parm_delay_default),
+    sizeof(dsp_parm_room_default),
+    sizeof(dsp_parm_combine_default),
+    sizeof(dsp_parm_bandpass_default),
+    sizeof(dsp_parm_lowpass_default),
+    sizeof(dsp_parm_highpass_default),
+    sizeof(dsp_parm_allpass_default),
+    sizeof(dsp_parm_tremolo_default),
+    sizeof(dsp_parm_vibrato_default),
+    sizeof(dsp_parm_wah_default),
+    sizeof(dsp_parm_autowah_default),
+    sizeof(dsp_parm_envelope_default),
+    sizeof(dsp_parm_distortion_default),
+    sizeof(dsp_parm_overdrive_default),
+    sizeof(dsp_parm_compressor_default),
+    sizeof(dsp_parm_ring_default),
+    sizeof(dsp_parm_flange_default),
+    sizeof(dsp_parm_chorus_default),
+    sizeof(dsp_parm_phaser_default),
+    sizeof(dsp_parm_backwards_default),
+    sizeof(dsp_parm_pitchshift_default),
+    sizeof(dsp_parm_whammy_default),
+    sizeof(dsp_parm_octave_default),
+    sizeof(dsp_parm_sine_synth_default)
+};
+
 /********************* DSP PROCESS STRUCTURE *******************************************/
 
 uint32_t dsp_read_value_prec(void *v, int prec)
@@ -1541,7 +1571,8 @@ void dsp_unit_initialize(int dsp_unit_number, dsp_unit_type dut)
     dp = dsp_parm_entry(dsp_unit_number);
     
     dsp_unit_struct_zero(du);
-    memcpy((void *)dp, dsp_parm_struct_defaults[dut], sizeof(dsp_parm));
+    memset((void *)dp, '\000', sizeof(dsp_parm));
+    memcpy((void *)dp, dsp_parm_struct_defaults[dut], dsp_parm_struct_defaults_len[dut]);
     dp->dtn.source_unit = dsp_unit_number + 1;
     DMB();
     dp->dtn.dut = dut;

@@ -34,7 +34,7 @@
 #include "synth.h"
 #include "ui.h"
 #include "tinycl.h"
-
+#include "patches.h"
 #include "usbmain.h"
 
 volatile bool waiting_for_sample = false;
@@ -941,9 +941,9 @@ uint select_bankno(uint bankno)
     while (notend)
     {
         char s[20];
-        sprintf(s,"Sel Bank: %02d", bankno);          
+        sprintf(s,"Sel Bank: %02d/%02d", bankno, FLASH_BANKS);          
         write_str_with_spaces(0,4,s,16);
-        flash_layout *fl = (flash_layout *) flash_offset_address_bank(bankno-1);
+        const flash_layout *fl = (flash_layout *) flash_offset_address_bank(bankno-1);
         write_str_with_spaces(0,5,fl->fld.magic_number == FLASH_MAGIC_NUMBER ? (char *)fl->fld.desc : "No Description",15);
         display_refresh();
         buttons_clear();
@@ -1015,11 +1015,8 @@ void pedal_display_state(void)
     write_str(12,7,pedal_current_state == 4 ? "\001\001\001" : "\002\002\002" );
 }
 
-int flash_load_bank(uint bankno)
+int flash_load_bank_ptr(const flash_layout *fl)
 {
-    flash_layout *fl = (flash_layout *) flash_offset_address_bank(bankno);
-
-    if (bankno >= FLASH_BANKS) return -1;
     if (fl->fld.magic_number == FLASH_MAGIC_NUMBER)
     {
         if (fl->fld.gen_no > last_gen_no)
@@ -1038,6 +1035,53 @@ int flash_load_bank(uint bankno)
         reset_load_controls();
     } else return -1;
     return 0;
+}
+
+
+int flash_load_bank(uint bankno)
+{
+    if (bankno >= FLASH_BANKS) return -1;
+
+    const flash_layout *fl = (flash_layout *) flash_offset_address_bank(bankno);
+    return flash_load_bank_ptr(fl);
+}
+
+void patch_load(void)
+{
+    uint patchno = 1;
+    bool notend = true;
+    
+    while (notend)
+    {
+        char s[20];
+        sprintf(s,"Sel Patch: %02d/%02d", patchno, PATCHES_NUMBER);          
+        write_str_with_spaces(0,4,s,16);
+        const flash_layout *fl = (flash_layout *) patches[patchno-1];
+        write_str_with_spaces(0,5,fl->fld.magic_number == FLASH_MAGIC_NUMBER ? (char *)fl->fld.desc : "No Description",15);
+        display_refresh();
+        buttons_clear();
+        for (;;)
+        {
+            idle_task();
+            if (button_enter())
+            {
+                flash_load_bank_ptr(fl);
+                notend = false;
+                break;
+            }
+            if (button_left()) return;
+            if ((button_up()) && (patchno < (PATCHES_NUMBER))) 
+            {
+                patchno++;
+                break;
+            }
+            if ((button_down()) && (patchno > 1)) 
+            {
+                patchno--;
+                break;
+            }
+        }
+    }
 }
 
 void pedal_switch(void)
@@ -1110,7 +1154,7 @@ void flash_load_most_recent(void)
 
     for (uint bankno = 0;bankno < FLASH_BANKS; bankno++)
     {
-        flash_layout *fl = (flash_layout *) flash_offset_address_bank(bankno);
+        const flash_layout *fl = (flash_layout *) flash_offset_address_bank(bankno);
         if (fl->fld.magic_number == FLASH_MAGIC_NUMBER)
         {
             if (fl->fld.gen_no >= newest_gen_no)
@@ -1214,7 +1258,7 @@ void debugstuff(void)
     }
 }
 
-const char * const mainmenu[] = { "SynthAdj", "FiltAdjust", "Panic", "Debug", "Pedal", "Load", "Save", "Conf", NULL };
+const char * const mainmenu[] = { "SynthAdj", "FiltAdjust", "Panic", "Patches", "Debug", "Pedal", "Load", "Save", "Conf", NULL };
 
 menu_str mainmenu_str = { mainmenu, 0, 2, 15, 0, 0 };
 
@@ -1541,6 +1585,34 @@ int load_cmd(int args, tinycl_parameter* tp, void *v)
   return 1;
 }
 
+int binpatch_cmd(int args, tinycl_parameter* tp, void *v)
+{
+  char s[80];
+  uint bankno=tp[0].ti.i;
+ 
+  if ((bankno == 0) || (bankno > FLASH_BANKS))
+  {
+     tinycl_put_string("Invalid bank number\r\n");
+     return 0;
+  }
+  const flash_layout *fl = (flash_layout *) flash_offset_address_bank(bankno-1);
+  uint32_t len = FLASH_PAGES(sizeof(flash_layout));
+  sprintf(s,"const uint8_t binary_patch[%u] = {\r\n",len);
+  tinycl_put_string(s);
+  for (uint c=0;c<len;c+=32)
+  {
+      tinycl_put_string("    ");
+      for (uint b=0;b<32;b++)
+      {
+        sprintf(s,"%u,",((uint8_t *)fl)[b+c]);
+        tinycl_put_string(s);
+      }
+      tinycl_put_string("\r\n");
+  }
+  tinycl_put_string("};\r\n\r\n");
+  return 1;
+}
+
 void copyspaces(char *c, const char *d, int n)
 {
     while ((n>0) && (*d != '\000'))
@@ -1568,17 +1640,17 @@ int setdesc_cmd(int args, tinycl_parameter* tp, void *v)
   
   copyspaces((char *)desc,parm,sizeof(desc)-1);
  
-  tinycl_put_string("Description: '");
+  tinycl_put_string("SETDESC ");
   tinycl_put_string((const char *)desc);
-  tinycl_put_string("'\r\n");
+  tinycl_put_string("\r\n");
   return 1;
 }
 
 int getdesc_cmd(int args, tinycl_parameter* tp, void *v)
 {
-  tinycl_put_string("Description: '");
+  tinycl_put_string("SETDESC ");
   tinycl_put_string((const char *)desc);
-  tinycl_put_string("'\r\n");
+  tinycl_put_string("\r\n");
   return 1;
 }
 
@@ -1604,7 +1676,7 @@ int pget_cmd(int args, tinycl_parameter *tp, void *V)
   {
     for (n=0;n<NUMBER_OF_CONTROLS;n++)
     {
-        sprintf(s,"PSET %u %u\r\n ", n+1, samples[n]);
+        sprintf(s,"PSET %u %u\r\n", n+1, samples[n]);
         tinycl_put_string(s);
     }
   } else
@@ -1635,6 +1707,7 @@ const tinycl_command tcmds[] =
   { "STYPE", "Get synth type", stype_cmd, TINYCL_PARM_INT, TINYCL_PARM_END },
   { "PSET",  "Potentiometer Set", pset_cmd, TINYCL_PARM_INT, TINYCL_PARM_INT, TINYCL_PARM_END },
   { "PGET",  "Potentiometer Get", pget_cmd, TINYCL_PARM_INT, TINYCL_PARM_END },
+  { "BINPATCH", "Export patch", binpatch_cmd, TINYCL_PARM_INT, TINYCL_PARM_END },
   { "HELP", "Display This Help", help_cmd, {TINYCL_PARM_END } }
 };
 
@@ -1743,7 +1816,7 @@ static void synth_task(void)
         int32_t s = synth_process_all_units();
         if (s < (-QUANTIZATION_MAX)) s = -QUANTIZATION_MAX;
         if (s > (QUANTIZATION_MAX-1)) s = QUANTIZATION_MAX-1;
-        next_sample = (s + QUANTIZATION_MAX) / ((QUANTIZATION_MAX*2) / DAC_PWM_WRAP_VALUE);
+        next_sample = (s + QUANTIZATION_MAX) / ((QUANTIZATION_MAX*2) / ADC_MAX_VALUE);
         waiting_for_sample = true;
     }
 }
@@ -1800,15 +1873,17 @@ int main()
                      break;
             case 2:  synth_panic();
                      break;
-            case 3:  debugstuff();
+            case 3:  patch_load();
                      break;
-            case 4:  pedal_control_cmd();
+            case 4:  debugstuff();
                      break;
-            case 5:  flash_load();
+            case 5:  pedal_control_cmd();
                      break;
-            case 6:  flash_save();
+            case 6:  flash_load();
                      break;
-            case 7:  configuration();
+            case 7:  flash_save();
+                     break;
+            case 8:  configuration();
                      break;
         }
     }
