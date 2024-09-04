@@ -183,7 +183,7 @@ void midi_button_event(uint8_t note, uint8_t on_off)
     if (on_off)
     {
         msg[0] = 0x90;                    // Note On - Channel 1
-        msg[1] = note+pc.note_transpose;  // Note Number
+        msg[1] = note+pc.pcs.note_transpose;  // Note Number
         msg[2] = 127;                     // Velocity
         tud_midi_n_stream_write(0, 0, msg, 3);
         uart0_output(msg, 3);
@@ -191,7 +191,7 @@ void midi_button_event(uint8_t note, uint8_t on_off)
     } else
     {
         msg[0] = 0x80;                    // Note Off - Channel 1
-        msg[1] = note+pc.note_transpose;  // Note Number
+        msg[1] = note+pc.pcs.note_transpose;  // Note Number
         msg[2] = 127;                     // Velocity
         tud_midi_n_stream_write(0, 0, msg, 3);
         uart0_output(msg, 3);

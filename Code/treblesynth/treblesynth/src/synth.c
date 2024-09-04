@@ -898,7 +898,7 @@ void synth_stop_note(uint8_t note_no, uint8_t velocity)
         if ((synth_note_active[note]) && (synth_note_number[note] == note_no))
         {
             mutex_enter_blocking(&note_mutexes[note]);
-            synth_note_stopping_counter[note] = pc.fail_delay;
+            synth_note_stopping_counter[note] = pc.pcs.fail_delay;
             DMB();
             synth_note_stopping[note] = true;
             DMB();
@@ -913,7 +913,7 @@ void synth_panic(void)
     for (int note=0;note<MAX_POLYPHONY;note++)
         if (synth_note_active[note])
         {
-            synth_note_stopping_counter[note] = pc.fail_delay;
+            synth_note_stopping_counter[note] = pc.pcs.fail_delay;
             DMB();
             mutex_enter_blocking(&note_mutexes[note]);
             synth_note_stopping[note] = true;

@@ -76,17 +76,21 @@ void reset_control_samples_core(uint16_t *reset_samples);
 
 project_configuration pc;
 
-const project_configuration pc_default =
+const project_configuration_s pc_default_s =
 {
   PROJECT_MAGIC_NUMBER,  /* magic_number */
   48,                    /* transpose value */
+  0,                     /* midi device number */
   45000,                 /* fail delay */
 };
 
 void initialize_project_configuration(void)
 {
-    if (pc.magic_number != PROJECT_MAGIC_NUMBER)
-        memcpy((void *)&pc, (void *)&pc_default, sizeof(pc));
+    if (pc.pcs.magic_number != PROJECT_MAGIC_NUMBER)
+    {
+        memset((void *)&pc, '\000', sizeof(pc));
+        memcpy((void *)&pc.pcs, (void *)&pc_default_s, sizeof(pc_default_s));
+    }
 }
 
 static inline int potentiometer_index_value(uint c)
@@ -1730,8 +1734,8 @@ typedef struct _configuration_entry
 
 const configuration_entry configuration_entries[] = 
 {
-  { &pc.note_transpose,             1, 2, 0, 95 },    /* NOTE TRANSPOSE */
-  { &pc.fail_delay,                 4, 5, 1, 99999 }  /* FAIL DELAY */
+  { &pc.pcs.note_transpose,             1, 2, 0, 95 },    /* NOTE TRANSPOSE */
+  { &pc.pcs.fail_delay,                 4, 5, 1, 99999 }  /* FAIL DELAY */
 };
 
 void configuration(void)

@@ -31,7 +31,7 @@ extern "C" {
 
 #include <stdint.h>
 
-#define PATCHES_NUMBER 14
+#define PATCHES_NUMBER 18
 
 extern const uint8_t *patches[PATCHES_NUMBER];
 

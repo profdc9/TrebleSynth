@@ -99,13 +99,22 @@ uint16_t read_potentiometer_value(uint v);
 void set_debug_vals(int32_t v1, int32_t v2, int32_t v3);
 
 #define POTENTIOMETER_VALUE_SENSITIVITY 20
-#define PROJECT_MAGIC_NUMBER 0xF00BB00F
+#define PROJECT_MAGIC_NUMBER 0xF00BB00E
 
-typedef struct _project_configuration
-{ 
+#define PROJECT_CONFIGURATION_PAD_LENGTH 256
+
+typedef struct _project_configuration_s
+{
   uint32_t  magic_number;
   uint8_t   note_transpose;
+  uint8_t   midi_device_no;
   uint32_t  fail_delay;
+} project_configuration_s;  
+
+typedef union _project_configuration
+{ 
+  project_configuration_s pcs;
+  uint8_t   pad[PROJECT_CONFIGURATION_PAD_LENGTH];
 } project_configuration;
 
 extern project_configuration pc;
